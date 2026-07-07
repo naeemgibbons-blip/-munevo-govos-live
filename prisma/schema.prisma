@@ -1,0 +1,86 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Property Digital Twin
+model Property {
+  id             String         @id @default(uuid())
+  address        String         @unique
+  zipCode        String
+  ownerName      String
+  assessedValue  Float
+  taxStatus      String         // "Paid" | "Delinquent"
+  zoningDistrict String
+  notes          String?
+  permits        Permit[]
+  inspections    Inspection[]
+  trackerItems   TrackerItem[]
+}
+
+// 2. Business Developer
+model Business {
+  id               String         @id @default(uuid())
+  name             String         @unique
+  sector           String
+  complianceRating String         // "Grade A"
+  projects         Project[]
+}
+
+// 3. Redevelopment Project
+model Project {
+  id          String         @id @default(uuid())
+  name        String         @unique
+  status      String         // "Active" | "Completed"
+  businessId  String
+  business    Business       @relation(fields: [businessId], references: [id])
+  permits     Permit[]
+}
+
+// 4. Permits
+model Permit {
+  id            String         @id @default(uuid())
+  permitNumber  String         @unique
+  type          String         // "Building" | "Zoning"
+  status        String         // "Issued" | "Approved"
+  estimatedCost Float
+  propertyId    String
+  property      Property       @relation(fields: [propertyId], references: [id])
+  projectId     String?
+  project       Project?       @relation(fields: [projectId], references: [id])
+  inspections   Inspection[]
+}
+
+// 5. Inspections
+model Inspection {
+  id             String         @id @default(uuid())
+  type           String         // "Structural" | "Safety"
+  scheduledDate  DateTime
+  status         String         // "Passed" | "Failed"
+  inspectorName  String
+  notes          String
+  propertyId     String
+  property       Property       @relation(fields: [propertyId], references: [id])
+  permitId       String?
+  permit         Permit?        @relation(fields: [permitId], references: [id])
+}
+
+// 6. Universal Operations Tracker
+model TrackerItem {
+  id           String         @id @default(uuid())
+  module       String         // "311" | "Permits"
+  title        String
+  status       String         // "Open" | "Resolved"
+  priority     String         // "High" | "Medium"
+  assignedTo   String
+  slaDays      Int
+  slaProgress  Int
+  reportedDate DateTime       @default(now())
+  propertyId   String
+  property     Property       @relation(fields: [propertyId], references: [id])
+}
