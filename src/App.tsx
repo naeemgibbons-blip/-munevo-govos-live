@@ -491,6 +491,7 @@ function App() {
                 {activeModule === 'command-center' && (
                   <CommandCenter 
                     currentRole={currentRole}
+                    currentProfile={currentProfile}
                     onOpenChart={handleOpenChart}
                     trackerItems={trackerItems}
                     setTrackerItems={setTrackerItems}

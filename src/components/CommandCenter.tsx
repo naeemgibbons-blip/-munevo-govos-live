@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -26,17 +26,21 @@ import {
   Gavel,
   Briefcase,
   Calendar,
-  Compass
+  Compass,
+  FileText,
+  Users,
+  ShieldCheck,
+  Check,
+  X
 } from 'lucide-react';
 
 interface CommandCenterProps {
   currentRole: UserRole;
+  currentProfile: any;
   onOpenChart: (type: 'property' | 'permit' | 'legislative' | 'business', id: string) => void;
-  // Tracker items list managed at parent level to support additions
   trackerItems: TrackerItem[];
   setTrackerItems: React.Dispatch<React.SetStateAction<TrackerItem[]>>;
   addNotification: (message: string) => void;
-  // Callback when a permit/violation is updated
   onUpdatePermit: (id: string, updated: Partial<PermitRecord>) => void;
   onUpdateInspection: (id: string, updated: Partial<InspectionRecord>) => void;
   canEdit?: boolean;
@@ -44,6 +48,7 @@ interface CommandCenterProps {
 
 export const CommandCenter: React.FC<CommandCenterProps> = ({
   currentRole,
+  currentProfile,
   onOpenChart,
   trackerItems,
   setTrackerItems,
@@ -52,6 +57,9 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   onUpdateInspection,
   canEdit = true
 }) => {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const orgId = currentProfile?.organizationId || '';
+
   // Local states for forms
   const [newRequestAddress, setNewRequestAddress] = useState('42 Ferry St, Newark, NJ');
   const [newRequestType, setNewRequestType] = useState('Trash & Debris');
@@ -64,6 +72,20 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
     netting: false,
     clearance: false
   });
+
+  // Open Records State for Clerk landing
+  const [openRecords, setOpenRecords] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (orgId && (currentRole.id === 'clerk' || currentProfile?.role?.name === 'City Clerk' || currentProfile?.role?.name === 'Compliance Officer')) {
+      fetch(`${API_URL}/api/open-records`, {
+        headers: { 'x-organization-id': orgId }
+      })
+      .then(res => res.json())
+      .then(data => setOpenRecords(data))
+      .catch(err => console.error('Failed to load open records in CommandCenter:', err));
+    }
+  }, [orgId, currentRole.id]);
 
   // Handle submitting 311 request
   const handleSubmit311 = (e: React.FormEvent) => {
@@ -138,107 +160,314 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
     setActiveInspectionId(null);
   };
 
-  // Render role-specific dashboards
+  // Helper to determine staff user's name
+  const getUserDisplayName = () => {
+    if (currentProfile?.email) {
+      return currentProfile.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+    }
+    return 'Naeem';
+  };
+
+  // Dynamic Workspace Filters (Epic Hyperspace Landing)
+  const myAssignedTickets = trackerItems.filter(item => {
+    const userEmail = currentProfile?.email || '';
+    const userRoleName = currentProfile?.role?.name || currentRole.name;
+    return (
+      item.assignedTo.toLowerCase().includes(userEmail.toLowerCase()) ||
+      item.assignedTo.toLowerCase().includes(userRoleName.toLowerCase()) ||
+      (currentRole.id === 'inspector' && (item.assignedTo === 'Marcus Miller' || item.assignedTo === 'Elena Rostova')) ||
+      (currentRole.id === 'public_works' && item.assignedTo.includes('Public Works'))
+    );
+  });
+
+  const myScheduledInspections = Object.values(INSPECTIONS).filter(insp => {
+    const isToday = insp.scheduledDate === '2026-07-07';
+    const isMe = currentRole.id === 'inspector' || insp.inspectorName.toLowerCase().includes(getUserDisplayName().toLowerCase());
+    return isToday && isMe;
+  });
+
+  const pendingPermits = Object.values(PERMITS).filter(p => p.status === 'Issued' || p.status === 'In Review');
+
+  const pendingRecords = openRecords.filter(r => r.status === 'Received' || r.status === 'Under Review');
+
+  // Render tailormade Epic Hyperspace layout
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
       {/* Title */}
-      <div>
-        <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>
-          Welcome back, <span className="brand-gradient-text">Naeem</span>
-        </h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          {currentRole.description}
-        </p>
+      <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>
+            Welcome to Munevo Workspace, <span className="brand-gradient-text">{getUserDisplayName()}</span>
+          </h2>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
+            Role Context: <strong>{currentProfile?.role?.name || currentRole.name}</strong> • Department: {currentRole.department}
+          </p>
+        </div>
+        <div style={{ padding: '6px 12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '6px', fontSize: '11px', color: 'var(--primary-color)', fontWeight: 600 }}>
+          System Online & Encrypted
+        </div>
       </div>
 
-      {/* Stats Cards (Role specific) */}
+      {/* Epic Style Metrics Banner */}
       <div className="grid-metrics">
-        {currentRole.commandCenter.metrics.map((metric, i) => (
-          <div key={i} className={`metric-card metric-status-${metric.status || 'normal'}`}>
-            <span className="metric-label">{metric.label}</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span className="metric-value">{metric.value}</span>
-              {metric.trend && <span className="metric-trend">{metric.trend}</span>}
+        {currentRole.id === 'mayor' ? (
+          <>
+            <div className="metric-card metric-status-normal">
+              <span className="metric-label">Avg Ticket SLA Time</span>
+              <span className="metric-value">18.4 hrs</span>
             </div>
-          </div>
-        ))}
+            <div className="metric-card metric-status-warn">
+              <span className="metric-label">Pending Council Votes</span>
+              <span className="metric-value">3 Resolutions</span>
+            </div>
+            <div className="metric-card metric-status-normal">
+              <span className="metric-label">Municipal Budget Health</span>
+              <span className="metric-value">On Track</span>
+            </div>
+            <div className="metric-card metric-status-normal">
+              <span className="metric-label">Revenue Collections</span>
+              <span className="metric-value">98.2%</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="metric-card metric-status-normal">
+              <span className="metric-label">My Assigned Tickets</span>
+              <span className="metric-value">{myAssignedTickets.length} cases</span>
+            </div>
+            <div className="metric-card metric-status-normal">
+              <span className="metric-label">My Scheduled Visits</span>
+              <span className="metric-value">{myScheduledInspections.length} today</span>
+            </div>
+            <div className="metric-card metric-status-warn">
+              <span className="metric-label">Pending Reviews</span>
+              <span className="metric-value">
+                {currentRole.id === 'clerk' ? pendingRecords.length : pendingPermits.length} items
+              </span>
+            </div>
+            <div className="metric-card metric-status-normal">
+              <span className="metric-label">Shift Duration logged</span>
+              <span className="metric-value">8.0 hrs</span>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Role Dashboard Layouts */}
-      {currentRole.id === 'mayor' && (
+      {/* Main Epic Work Board */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+        
+        {/* Left Column: My Active Queue */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* AI Executive briefing */}
-          <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-color)' }}>
-            <div className="card-header">
-              <div className="card-title">
-                <Sparkles className="brand-gradient-text" size={16} />
-                <span>AI Daily Executive Briefing</span>
+          
+          {/* Section A: Assigned Tickets */}
+          {currentRole.id !== 'mayor' && currentRole.id !== 'resident' && (
+            <div className="glass-card">
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="card-title">
+                  <Clock size={14} style={{ color: 'var(--primary-color)' }} />
+                  <span>My Active Work Queue (Assigned to Me)</span>
+                </div>
+                <span className="badge-status badge-primary" style={{ fontSize: '0.65rem' }}>{myAssignedTickets.length} Open</span>
               </div>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Updated 10m ago</span>
+              
+              <div className="list-queue">
+                {myAssignedTickets.length === 0 ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                    No operations tickets are currently assigned to you.
+                  </div>
+                ) : (
+                  myAssignedTickets.map(item => (
+                    <div key={item.id} className="queue-item" onClick={() => onOpenChart('property', 'prop_01')}>
+                      <div className="queue-details">
+                        <span className="queue-title">{item.title}</span>
+                        <span className="queue-sub">{item.address} • SLA Limit: {item.slaDays} days</span>
+                      </div>
+                      <span className={`badge-status ${item.priority === 'Critical' ? 'badge-danger' : 'badge-warn'}`}>
+                        {item.priority}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-            <p style={{ fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-primary)' }}>
-              Good afternoon Mayor. The City of Newark SLA health is at <strong>94%</strong>. One critical incident remains unresolved: a deteriorating entry awning at <strong>105 Market St</strong>. Building Inspector Marcus Miller is scheduled for an emergency site inspection at 2:00 PM today.
-              Additionally, <strong>LEG-2026-004</strong> (Redevelopment Grant for 15 Washington St) has been added to the July 9th council agenda. No budget overruns detected.
-            </p>
-          </div>
+          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            {/* Critical Approvals */}
+          {/* Mayor AI Daily Executive Briefing */}
+          {currentRole.id === 'mayor' && (
+            <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-color)' }}>
+              <div className="card-header">
+                <div className="card-title">
+                  <Sparkles className="brand-gradient-text" size={16} />
+                  <span>AI Daily Executive Briefing</span>
+                </div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Updated 10m ago</span>
+              </div>
+              <p style={{ fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-primary)', margin: 0 }}>
+                Good afternoon Mayor. Newark SLA compliance rates remain strong at <strong>94%</strong>. Building Inspector Elena Rostova is completing structural case reviews at <strong>12 Ferry St</strong>.
+                Additionally, council resolution <strong>LEG-2026-004</strong> (Facade restoration grant funding) is slated for vote certification at tomorrow's public hearing.
+              </p>
+            </div>
+          )}
+
+          {/* Clerk Meeting docket */}
+          {currentRole.id === 'clerk' && (
             <div className="glass-card">
               <div className="card-header">
-                <div className="card-title">Pending Executive Approvals</div>
+                <div className="card-title">
+                  <Calendar size={14} style={{ color: 'var(--primary-color)' }} />
+                  <span>Upcoming Council Meetings Agenda Packets</span>
+                </div>
               </div>
               <div className="list-queue">
-                <div className="queue-item" onClick={() => onOpenChart('permit', 'perm_03')}>
+                <div className="queue-item" onClick={() => onOpenChart('legislative', 'LEG-2026-004')}>
                   <div className="queue-details">
-                    <span className="queue-title">Water Booster Pump Installation</span>
-                    <span className="queue-sub">15 Washington St • Est. Cost: $35,000</span>
+                    <span className="queue-title">Resolution IX.B.1 (15 Washington St Facade Grant)</span>
+                    <span className="queue-sub">Hearing: 2026-07-09 • Zoning Committee</span>
                   </div>
-                  <span className="badge-status badge-warn">In Review</span>
+                  <span className="badge-status badge-warn">Pending Hearing</span>
                 </div>
-                <div className="queue-item" onClick={() => onOpenChart('permit', 'perm_04')}>
+                <div className="queue-item" onClick={() => onOpenChart('legislative', 'LEG-2026-007')}>
                   <div className="queue-details">
-                    <span className="queue-title">Stained Glass Restoration (City Hall)</span>
-                    <span className="queue-sub">920 Broad St • Est. Cost: $85,000</span>
+                    <span className="queue-title">Resolution IX.B.2 (West Ward Redevelopment Agreement)</span>
+                    <span className="queue-sub">Hearing: 2026-07-09 • Econ Development</span>
                   </div>
-                  <span className="badge-status badge-primary">Applied</span>
+                  <span className="badge-status badge-warn">Pending Hearing</span>
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Quick Actions */}
+          {/* Finance Abatement ledger */}
+          {currentRole.id === 'finance' && (
             <div className="glass-card">
               <div className="card-header">
-                <div className="card-title">Executive Shortcuts</div>
+                <div className="card-title">
+                  <DollarSign size={14} style={{ color: 'var(--success-text)' }} />
+                  <span>Active Opportunity Zone Abatements</span>
+                </div>
               </div>
-              <div className="quick-actions-grid">
-                <button className="btn-action" onClick={() => onOpenChart('legislative', 'LEG-2026-004')}>
-                  <Building size={16} />
-                  <span>Review 15 Wash. Resolution</span>
-                </button>
-                <button className="btn-action" onClick={() => onOpenChart('property', 'prop_04')}>
-                  <AlertTriangle size={16} style={{ color: 'var(--danger-text)' }} />
-                  <span>Examine 105 Market Case</span>
-                </button>
+              <div className="list-queue">
+                <div className="queue-item" onClick={() => onOpenChart('business', 'DCF Developers, LLC')}>
+                  <div className="queue-details">
+                    <span className="queue-title">West Ward PILOT Agreement: DCF Developers, LLC</span>
+                    <span className="queue-sub">125 & 129 Market St • Code Grade A</span>
+                  </div>
+                  <span className="badge-status badge-success">Enrolled</span>
+                </div>
+                <div className="queue-item" onClick={() => onOpenChart('property', 'prop_04')}>
+                  <div className="queue-details">
+                    <span className="queue-title">Opportunity Zone Abatement: 105 Market St</span>
+                    <span className="queue-sub">Market Street Realty • Tax Delinquent</span>
+                  </div>
+                  <span className="badge-status badge-danger">Lien Eligible</span>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {currentRole.id === 'inspector' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
-          {/* Scheduled list and execution form */}
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">Today's Inspection Routing Schedule</div>
+          {/* Planner Variance board */}
+          {currentRole.id === 'planner' && (
+            <div className="glass-card">
+              <div className="card-header">
+                <div className="card-title">
+                  <Briefcase size={14} style={{ color: 'var(--primary-color)' }} />
+                  <span>Zoning Variance Approvals Queue</span>
+                </div>
+              </div>
+              <div className="list-queue">
+                <div className="queue-item" onClick={() => onOpenChart('permit', 'perm_05')}>
+                  <div className="queue-details">
+                    <span className="queue-title">Sidewalk Dining Table Variance (PM-2026-0298)</span>
+                    <span className="queue-sub">42 Ferry St • Silva Bakery & Café</span>
+                  </div>
+                  <span className="badge-status badge-success">Approved</span>
+                </div>
+              </div>
             </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          )}
+
+          {/* Public Works Work Orders */}
+          {currentRole.id === 'public_works' && (
+            <div className="glass-card">
+              <div className="card-header">
+                <div className="card-title">
+                  <Compass size={14} style={{ color: 'var(--accent-color)' }} />
+                  <span>Active Fleet Work Orders</span>
+                </div>
+              </div>
+              <div className="list-queue">
+                <div className="queue-item" onClick={() => onOpenChart('property', 'prop_03')}>
+                  <div className="queue-details">
+                    <span className="queue-title">WO-8832: Repair main water booster connection</span>
+                    <span className="queue-sub">42 Ferry St • Ironbound District • Priority: High</span>
+                  </div>
+                  <span className="badge-status badge-warn">Dispatched</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Resident Form */}
+          {currentRole.id === 'resident' && (
+            <div className="glass-card">
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="card-title">
+                  <Plus size={16} />
+                  <span>Submit a 311 Service Request</span>
+                </div>
+              </div>
+              <form onSubmit={handleSubmit311} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location Address</label>
+                  <select className="select-filter" value={newRequestAddress} onChange={e => setNewRequestAddress(e.target.value)}>
+                    {Object.values(PROPERTIES).map(p => (
+                      <option key={p.id} value={p.address}>{p.address}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Request Type</label>
+                  <select className="select-filter" value={newRequestType} onChange={e => setNewRequestType(e.target.value)}>
+                    <option value="Trash & Debris">Trash & Debris</option>
+                    <option value="Water Pressure / Leak">Water Pressure & Leak</option>
+                    <option value="Illegal Parking">Illegal Parking</option>
+                    <option value="Structural Hazard">Structural Hazard</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident Details</label>
+                  <textarea className="ai-input" style={{ minHeight: '70px', width: '100%' }} placeholder="Describe the issue you noticed..." value={newRequestDesc} onChange={e => setNewRequestDesc(e.target.value)} required />
+                </div>
+                <button type="submit" className="ai-btn-send" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Send size={12} />
+                  <span>Submit 311 Ticket</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+        </div>
+
+        {/* Right Column: Schedule & Shortcuts */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* Inspector schedule and log notes */}
+          {currentRole.id === 'inspector' && (
+            <div className="glass-card">
+              <div className="card-header">
+                <div className="card-title">
+                  <Calendar size={14} style={{ color: 'var(--warning-text)' }} />
+                  <span>My Scheduled Inspections Today</span>
+                </div>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {Object.values(INSPECTIONS)
-                  .filter(insp => insp.scheduledDate === '2026-07-07')
-                  .map(insp => {
+                {myScheduledInspections.length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
+                    No field audits scheduled for today.
+                  </div>
+                ) : (
+                  myScheduledInspections.map(insp => {
                     const isSelected = activeInspectionId === insp.id;
                     const prop = PROPERTIES[insp.propertyId];
                     return (
@@ -249,411 +478,143 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                           setInspectorNotes(insp.notes);
                         }}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
                           padding: '10px 14px',
-                          background: isSelected ? 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.15)' : 'rgba(255,255,255,0.02)',
+                          background: isSelected ? 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.12)' : 'rgba(255,255,255,0.02)',
                           border: `1px solid ${isSelected ? 'var(--primary-color)' : 'var(--border-color)'}`,
                           borderRadius: '8px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
+                          cursor: 'pointer'
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{insp.type} Inspection ({insp.id})</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{prop?.address}</span>
+                          <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>{insp.type} Inspection ({insp.id})</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{prop?.address}</span>
                         </div>
-                        <span className={`badge-status ${insp.status === 'Passed' ? 'badge-success' : insp.status === 'Failed' ? 'badge-danger' : 'badge-warn'}`}>
-                          {insp.status}
-                        </span>
                       </div>
                     );
-                  })}
+                  })
+                )}
               </div>
 
               {activeInspectionId && (
-                <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-color)' }}>
+                <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-color)', margin: 0 }}>
                     File Field Notes: {activeInspectionId}
                   </h4>
-                  
-                  {activeInspectionId === 'insp_03' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={inspectorChecks.masonry} 
-                          onChange={(e) => setInspectorChecks(c => ({ ...c, masonry: e.target.checked }))} 
-                        />
-                        Brick tuckpointing checks complete and compliant
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={inspectorChecks.netting} 
-                          onChange={(e) => setInspectorChecks(c => ({ ...c, netting: e.target.checked }))} 
-                        />
-                        Scaffolding debris safety mesh fully anchored
-                      </label>
-                    </div>
-                  )}
-
-                  {activeInspectionId === 'insp_05' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={inspectorChecks.clearance} 
-                          onChange={(e) => setInspectorChecks(c => ({ ...c, clearance: e.target.checked }))} 
-                        />
-                        Sidewalk right-of-way secured under hazard area
-                      </label>
-                    </div>
-                  )}
-
                   <textarea
                     className="ai-input"
-                    style={{ minHeight: '80px', width: '100%' }}
-                    placeholder="Enter inspection field observations..."
+                    style={{ minHeight: '60px', width: '100%' }}
+                    placeholder="Enter inspection observations..."
                     value={inspectorNotes}
-                    onChange={(e) => setInspectorNotes(e.target.value)}
+                    onChange={e => setInspectorNotes(e.target.value)}
                   />
-
-                  <div style={{ display: 'flex', gap: '8px', alignSelf: 'flex-end' }}>
-                    <button 
-                      className="ai-btn-send" 
-                      style={{ backgroundColor: 'var(--danger)', border: '1px solid var(--danger)' }}
-                      onClick={() => handleInspectionSubmit('Failed')}
-                    >
-                      Fail & Log Violation
-                    </button>
-                    <button 
-                      className="ai-btn-send"
-                      onClick={() => handleInspectionSubmit('Passed')}
-                    >
-                      Pass & Approve
-                    </button>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button className="ai-btn-send" style={{ backgroundColor: 'var(--danger)', border: 0 }} onClick={() => handleInspectionSubmit('Failed')}>Fail</button>
+                    <button className="ai-btn-send" onClick={() => handleInspectionSubmit('Passed')}>Pass</button>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          )}
 
-          {/* Assigned Open Permits */}
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">Assigned Permits</div>
-            </div>
-            <div className="list-queue">
-              {Object.values(PERMITS)
-                .filter(perm => perm.status === 'Issued' || perm.status === 'In Review')
-                .map(perm => (
-                  <div key={perm.id} className="queue-item" onClick={() => onOpenChart('permit', perm.id)}>
-                    <div className="queue-details">
-                      <span className="queue-title">{perm.permitNumber}</span>
-                      <span className="queue-sub">{perm.type} • {PROPERTIES[perm.propertyId]?.address}</span>
-                    </div>
-                    <span className="badge-status badge-primary">{perm.status}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {currentRole.id === 'resident' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          {/* Submit 311 Request */}
-          <div className="glass-card">
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="card-title">
-                <Plus size={16} />
-                <span>Submit a 311 Service Request</span>
-              </div>
-              {!canEdit && (
-                <span style={{ fontSize: '10px', color: 'var(--warning-text)', padding: '2px 8px', background: 'rgba(245,158,11,0.1)', borderRadius: '4px' }}>
-                  Locked
-                </span>
-              )}
-            </div>
-
-            <form onSubmit={handleSubmit311} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location Address</label>
-                <select 
-                  className="select-filter" 
-                  value={newRequestAddress} 
-                  onChange={(e) => setNewRequestAddress(e.target.value)}
-                  disabled={!canEdit}
-                >
-                  {Object.values(PROPERTIES).map(p => (
-                    <option key={p.id} value={p.address}>{p.address}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Request Type</label>
-                <select 
-                  className="select-filter" 
-                  value={newRequestType} 
-                  onChange={(e) => setNewRequestType(e.target.value)}
-                  disabled={!canEdit}
-                >
-                  <option value="Trash & Debris">Trash & Debris</option>
-                  <option value="Water Pressure / Leak">Water Pressure & Leak</option>
-                  <option value="Illegal Parking">Illegal Parking</option>
-                  <option value="Structural Hazard">Structural Hazard</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident Details</label>
-                <textarea
-                  className="ai-input"
-                  style={{ minHeight: '70px', width: '100%' }}
-                  placeholder={canEdit ? "Describe the issue you noticed..." : "Submissions are currently locked."}
-                  value={newRequestDesc}
-                  onChange={(e) => setNewRequestDesc(e.target.value)}
-                  required
-                  disabled={!canEdit}
-                />
-              </div>
-
-              <button type="submit" className="ai-btn-send" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }} disabled={!canEdit}>
-                <Send size={12} />
-                <span>Submit 311 Ticket</span>
-              </button>
-            </form>
-          </div>
-
-          {/* Resident Accounts & Bills */}
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">MyMunevo Bills & Documents</div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Water Utility (W-042-302)</span>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--warning-text)' }}>$84.50 Due</span>
-                </div>
-                <button 
-                  className="ai-btn-send"
-                  style={{ height: '36px' }}
-                  onClick={() => {
-                    addNotification('Water utility payment of $84.50 processed successfully!');
-                  }}
-                >
-                  Pay Now
-                </button>
-              </div>
-
-              <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Property Tax (Account #23908)</span>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success-text)' }}>$0.00 Due</span>
-                </div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Paid • July 2026</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Municipal Clerk Command Center */}
-      {currentRole.id === 'clerk' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">
-                <Calendar size={14} style={{ color: 'var(--primary-color)' }} />
-                <span>Upcoming Council Meetings Docket</span>
-              </div>
-            </div>
-            <div className="list-queue">
-              <div className="queue-item" onClick={() => onOpenChart('legislative', 'LEG-2026-004')}>
-                <div className="queue-details">
-                  <span className="queue-title">Resolution IX.B.1 (15 Washington St Facade Grant)</span>
-                  <span className="queue-sub">Hearing Date: 2026-07-09 • Zoning & Landmarks</span>
-                </div>
-                <span className="badge-status badge-warn">Pending Hearing</span>
-              </div>
-              <div className="queue-item" onClick={() => onOpenChart('legislative', 'LEG-2026-007')}>
-                <div className="queue-details">
-                  <span className="queue-title">Resolution IX.B.2 (DCF Developers West Ward Redevelopment)</span>
-                  <span className="queue-sub">Hearing Date: 2026-07-09 • Economic Development</span>
-                </div>
-                <span className="badge-status badge-warn">Pending Hearing</span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Clerk Records Requests queue */}
+          {currentRole.id === 'clerk' && (
             <div className="glass-card">
               <div className="card-header">
-                <div className="card-title">Legislative Quick Actions</div>
-              </div>
-              <div className="quick-actions-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
-                <button className="btn-action" onClick={() => addNotification('Public Hearing notice posted to city board.')}>
-                  <Send size={12} />
-                  <span>Publish Public notices</span>
-                </button>
-                <button className="btn-action" onClick={() => addNotification('Ordinance vote certification ledger exported.')}>
-                  <CheckCircle size={12} style={{ color: 'var(--success-text)' }} />
-                  <span>Certify Ordinance Vote</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Finance Director Command Center */}
-      {currentRole.id === 'finance' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">
-                <DollarSign size={14} style={{ color: 'var(--success-text)' }} />
-                <span>PILOT & Redevelopment Abatements Ledger</span>
-              </div>
-            </div>
-            <div className="list-queue">
-              <div className="queue-item" onClick={() => onOpenChart('business', 'DCF Developers, LLC')}>
-                <div className="queue-details">
-                  <span className="queue-title">West Ward PILOT Agreement: DCF Developers, LLC</span>
-                  <span className="queue-sub">125 & 129 Market St • Code Compliance Grade A</span>
-                </div>
-                <span className="badge-status badge-success">Enrolled</span>
-              </div>
-              <div className="queue-item" onClick={() => onOpenChart('property', 'prop_04')}>
-                <div className="queue-details">
-                  <span className="queue-title">Opportunity Zone Abatement: 105 Market St</span>
-                  <span className="queue-sub">Market Street Realty • Tax Status: Delinquent</span>
-                </div>
-                <span className="badge-status badge-danger">Lien Eligible</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">Financial Approval Queue</div>
-            </div>
-            <div className="list-queue">
-              <div className="queue-item" onClick={() => onOpenChart('permit', 'perm_03')}>
-                <div className="queue-details">
-                  <span className="queue-title">Requisition: Water Pump Booster ($35,000)</span>
-                  <span className="queue-sub">Economic Development Grant Allocation</span>
-                </div>
-                <button 
-                  className="ai-btn-send"
-                  style={{ height: '24px', fontSize: '0.65rem', padding: '0 8px' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    addNotification('Authorized water pump requisition of $35,000.');
-                  }}
-                >
-                  Authorize
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Planner & Zoning Command Center */}
-      {currentRole.id === 'planner' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">
-                <Briefcase size={14} style={{ color: 'var(--primary-color)' }} />
-                <span>Zoning Variance & Site Plan Queue</span>
-              </div>
-            </div>
-            <div className="list-queue">
-              <div className="queue-item" onClick={() => onOpenChart('permit', 'perm_05')}>
-                <div className="queue-details">
-                  <span className="queue-title">Sidewalk Dining Table Variance (PM-2026-0298)</span>
-                  <span className="queue-sub">42 Ferry St • Silva Bakery & Café</span>
-                </div>
-                <span className="badge-status badge-success">Approved</span>
-              </div>
-              <div className="queue-item" onClick={() => onOpenChart('business', 'DCF Developers, LLC')}>
-                <div className="queue-details">
-                  <span className="queue-title">West Ward Site Plan Clearance (Zoning Case PL-2026-0043)</span>
-                  <span className="queue-sub">125 Market St • Three-family residential block</span>
-                </div>
-                <span className="badge-status badge-success">Approved</span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-color)' }}>
-              <div className="card-header">
                 <div className="card-title">
-                  <Sparkles className="brand-gradient-text" size={14} />
-                  <span>AI Master Plan Matcher</span>
+                  <FileText size={14} style={{ color: 'var(--warning-text)' }} />
+                  <span>Pending FOIA / Record Requests</span>
                 </div>
               </div>
-              <p style={{ fontSize: '0.75rem', lineHeight: '1.4', color: 'var(--text-secondary)' }}>
-                Zoning check for **Silva Bakery sidewalk dining variance (PM-2026-0298)** is compliant with the **Ironbound Special District Master Plan Guideline Section 12-A** (requires at least 5ft pedestrian walkway buffer).
-              </p>
+              <div className="list-queue">
+                {pendingRecords.length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
+                    No record requests require review.
+                  </div>
+                ) : (
+                  pendingRecords.map(req => (
+                    <div key={req.id} className="queue-item" onClick={() => onOpenChart('property', 'prop_01')}>
+                      <div className="queue-details">
+                        <span className="queue-title">{req.requesterName}</span>
+                        <span className="queue-sub" style={{ display: 'block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {req.description}
+                        </span>
+                      </div>
+                      <span className="badge-status badge-warn">{req.status}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Public Works Command Center */}
-      {currentRole.id === 'public_works' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">
-                <Compass size={14} style={{ color: 'var(--accent-color)' }} />
-                <span>Today\'s Public Works Work Orders</span>
+          {/* Finance approvals list */}
+          {currentRole.id === 'finance' && (
+            <div className="glass-card">
+              <div className="card-header">
+                <div className="card-title">Pending Requisition Approvals</div>
+              </div>
+              <div className="list-queue">
+                <div className="queue-item" onClick={() => onOpenChart('permit', 'perm_03')}>
+                  <div className="queue-details">
+                    <span className="queue-title">Water Pump Booster ($35,000)</span>
+                    <span className="queue-sub">Capital Projects Allocation</span>
+                  </div>
+                  <button 
+                    className="ai-btn-send"
+                    style={{ height: '24px', fontSize: '0.65rem', padding: '0 8px' }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      addNotification('Requisition approved!');
+                    }}
+                  >
+                    Approve
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="list-queue">
-              <div className="queue-item" onClick={() => onOpenChart('property', 'prop_03')}>
-                <div className="queue-details">
-                  <span className="queue-title">WO-8832: Repair main water booster connection</span>
-                  <span className="queue-sub">42 Ferry St • Ironbound District • Priority: High</span>
-                </div>
-                <span className="badge-status badge-warn">Dispatched</span>
-              </div>
-              <div className="queue-item" onClick={() => onOpenChart('property', 'prop_04')}>
-                <div className="queue-details">
-                  <span className="queue-title">WO-9811: Secure exterior wooden entry hazards</span>
-                  <span className="queue-sub">105 Market St • Downtown Center • Priority: High</span>
-                </div>
-                <span className="badge-status badge-primary">Assigned</span>
-              </div>
-            </div>
-          </div>
+          )}
 
-          <div className="glass-card">
-            <div className="card-header">
-              <div className="card-title">Municipal Fleet & Utility GPS</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
-                <span>Water Repair Truck #2</span>
-                <span style={{ color: 'var(--success-text)', fontWeight: 'bold' }}>Active on site (Ferry St)</span>
+          {/* Mayor shortcuts list */}
+          {currentRole.id === 'mayor' && (
+            <div className="glass-card">
+              <div className="card-header">
+                <div className="card-title">Executive Council Actions</div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
-                <span>Heavy Duty Crew Cab #4</span>
-                <span style={{ color: 'var(--text-muted)' }}>Standby in depot</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button className="btn-action" onClick={() => onOpenChart('legislative', 'LEG-2026-004')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', cursor: 'pointer' }}>
+                  <Gavel size={14} />
+                  <span>Review Facade Grant resolution</span>
+                </button>
+                <button className="btn-action" onClick={() => onOpenChart('property', 'prop_04')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', cursor: 'pointer' }}>
+                  <AlertTriangle size={14} style={{ color: 'var(--danger-text)' }} />
+                  <span>Review Delinquent Conservation Case</span>
+                </button>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Resident utility bills */}
+          {currentRole.id === 'resident' && (
+            <div className="glass-card">
+              <div className="card-header">
+                <div className="card-title">My Utilities & Tax Statements</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Water Service Account</span>
+                    <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--warning-text)' }}>$84.50 Due</span>
+                  </div>
+                  <button className="ai-btn-send" style={{ height: '32px' }} onClick={() => addNotification('Utility payment processed!')}>Pay Bill</button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
+
+      </div>
+
     </div>
   );
 };
