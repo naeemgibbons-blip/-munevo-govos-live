@@ -10,7 +10,8 @@ import {
   TrendingUp, 
   Database,
   ArrowRightLeft,
-  ShieldCheck
+  ShieldCheck,
+  Shield
 } from 'lucide-react';
 import { UserRole } from '../mockData';
 
@@ -20,6 +21,7 @@ interface SidebarProps {
   currentRole: UserRole;
   tenant: string;
   setTenant: (tenant: string) => void;
+  currentProfile: any;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -27,20 +29,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveModule, 
   currentRole, 
   tenant, 
-  setTenant 
+  setTenant,
+  currentProfile
 }) => {
   const tenants = [
     { id: 'newark', name: 'Newark, NJ', sub: 'Newark Gov Cloud' },
-    { id: 'austin', name: 'Austin, TX', sub: 'Austin Gov Cloud' },
-    { id: 'seattle', name: 'Seattle, WA', sub: 'Seattle Gov Cloud' }
+    { id: 'austin', name: 'Austin, TX', sub: 'Austin Gov Cloud' }
   ];
 
   const toggleTenant = () => {
-    const currentIndex = tenants.findIndex(t => t.id === tenant);
-    const nextIndex = (currentIndex + 1) % tenants.length;
-    const nextTenant = tenants[nextIndex];
-    setTenant(nextTenant.id);
-    document.documentElement.setAttribute('data-theme', nextTenant.id);
+    // If Global Admin session, allow switching municipalities
+    if (currentProfile?.isGlobalAdmin) {
+      const currentIndex = tenants.findIndex(t => t.id === tenant);
+      const nextIndex = (currentIndex + 1) % tenants.length;
+      const nextTenant = tenants[nextIndex];
+      setTenant(nextTenant.id);
+      document.documentElement.setAttribute('data-theme', nextTenant.id);
+    }
   };
 
   const getTenantLogo = () => {
@@ -49,7 +54,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return 'SE';
   };
 
-  const menuItems = [
+  // Base Menu items definition
+  const baseMenuItems = [
     { id: 'command-center', name: 'Command Center', icon: ClipboardList, group: 'Personal Workspace' },
     { id: 'tracker', name: 'Universal Tracker', icon: Layers, group: 'Operations' },
     { id: 'gis', name: 'GIS Intelligence', icon: Map, group: 'Operations' },
@@ -58,6 +64,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'legislative', name: 'Legislative Hub', icon: Calendar, group: 'Departments' },
     { id: 'identity-security', name: 'Identity & Security', icon: ShieldCheck, group: 'Administration' }
   ];
+
+  // Filter Menu items based on active User Profile Permissions
+  const menuItems = baseMenuItems.filter(item => {
+    // Admins have access to everything
+    if (currentProfile?.isGlobalAdmin || currentProfile?.isOrgAdmin) {
+      return true;
+    }
+    // Resident portal has access to limited public modules (e.g. Command Center, Tracker, Legislative, GIS)
+    if (currentProfile && !currentProfile.roleId) {
+      return ['command-center', 'tracker', 'gis', 'legislative', 'identity-security'].includes(item.id);
+    }
+    // Staff users filtered by role permissions
+    if (currentProfile?.role?.permissions) {
+      const perm = currentProfile.role.permissions.find((p: any) => p.module === item.id);
+      return perm?.canView ?? false;
+    }
+    return true;
+  });
+
+  // Append Admin consoles dynamically
+  if (currentProfile?.isGlobalAdmin) {
+    menuItems.push({ id: 'global-admin', name: 'Global Admin Console', icon: Database, group: 'Administration' });
+  } else if (currentProfile?.isOrgAdmin) {
+    menuItems.push({ id: 'org-admin', name: 'Org Admin Console', icon: Shield, group: 'Administration' });
+  }
 
   // Group menu items
   const groups = Array.from(new Set(menuItems.map(item => item.group)));
@@ -70,7 +101,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="tenant-selector">
-        <div className="tenant-pill" onClick={toggleTenant} title="Click to switch Multi-Tenant branding">
+        <div 
+          className="tenant-pill" 
+          onClick={toggleTenant} 
+          title={currentProfile?.isGlobalAdmin ? "Click to switch Multi-Tenant branding" : "Branding locked to tenant"}
+          style={{ cursor: currentProfile?.isGlobalAdmin ? 'pointer' : 'default' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
               width: '24px', 
@@ -88,14 +124,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
               <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-primary)' }}>
-                {tenants.find(t => t.id === tenant)?.name}
+                {tenants.find(t => t.id === tenant)?.name || 'Austin, TX'}
               </span>
               <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                {tenants.find(t => t.id === tenant)?.sub}
+                {tenants.find(t => t.id === tenant)?.sub || 'Austin Gov Cloud'}
               </span>
             </div>
           </div>
-          <ArrowRightLeft size={12} style={{ color: 'var(--text-muted)' }} />
+          {currentProfile?.isGlobalAdmin && <ArrowRightLeft size={12} style={{ color: 'var(--text-muted)' }} />}
         </div>
       </div>
 

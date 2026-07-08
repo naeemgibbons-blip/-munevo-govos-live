@@ -7,6 +7,8 @@ import { UniversalTracker } from './components/UniversalTracker';
 import { AiPanel } from './components/AiPanel';
 import { LegislativeHub } from './components/LegislativeHub';
 import { IdentityConsole } from './components/IdentityConsole';
+import { GlobalAdminConsole } from './components/GlobalAdminConsole';
+import { OrgAdminConsole } from './components/OrgAdminConsole';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -28,13 +30,19 @@ interface ToastMessage {
 }
 
 function App() {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
   // Tenant & Role State
   const [tenant, setTenant] = useState('newark');
   const [currentRole, setCurrentRole] = useState(USER_ROLES.mayor);
 
+  // Multi-Tenant Profile & Orgs Sync
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [customRoles, setCustomRoles] = useState<any[]>([]);
+  const [currentProfile, setCurrentProfile] = useState<any>(null);
+
   // Layout Modules
   const [activeModule, setActiveModule] = useState('command-center');
-  // 'module' vs 'chart-workspace' view mode
   const [viewMode, setViewMode] = useState<'module' | 'chart'>('module');
 
   // Chart Workspace Tabs State
@@ -42,20 +50,126 @@ function App() {
   const [activeChartTabId, setActiveChartTabId] = useState<string | null>(null);
 
   // Operations Data States
+  const [properties, setProperties] = useState<Record<string, any>>(PROPERTIES);
   const [trackerItems, setTrackerItemsRaw] = useState<TrackerItem[]>(TRACKER_ITEMS);
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+  // Fetch Organizations on boot
+  useEffect(() => {
+    fetch(`${API_URL}/api/organizations`)
+      .then(res => res.json())
+      .then(data => setOrganizations(data))
+      .catch(err => console.error('Failed to load organizations directory:', err));
+  }, []);
+
+  const currentOrg = organizations.find(o => o.slug === tenant);
+  const currentOrgId = currentOrg?.id || '';
+
+  // Fetch Tenant custom roles list on tenant switch
+  useEffect(() => {
+    if (!currentOrgId) return;
+    fetch(`${API_URL}/api/custom-roles`, {
+      headers: { 'x-organization-id': currentOrgId }
+    })
+    .then(res => res.json())
+    .then(data => setCustomRoles(data))
+    .catch(err => console.error('Failed to load custom roles context:', err));
+  }, [currentOrgId]);
+
+  // Synchronize simulated user profile to Database on Role/Tenant Switch
+  useEffect(() => {
+    if (!currentOrgId && currentRole.id !== 'global_admin') return;
+
+    const simulatedUserId = `simulated-user-${currentRole.id}`;
+    const simulatedUserEmail = `${currentRole.id}@munevo.gov`;
+    
+    let isGlobalAdmin = false;
+    let isOrgAdmin = false;
+    let roleId = null;
+
+    if (currentRole.id === 'global_admin') {
+      isGlobalAdmin = true;
+    } else if (currentRole.id === 'mayor') {
+      isOrgAdmin = true;
+    } else if (currentRole.id === 'inspector') {
+      // Find Newark Custom Inspector role from DB context
+      const inspectorRole = customRoles.find(r => r.name === 'Building Inspector' || r.name === 'Code Enforcement Officer');
+      roleId = inspectorRole?.id || null;
+    }
+
+    fetch(`${API_URL}/api/profiles/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: simulatedUserId,
+        email: simulatedUserEmail,
+        isGlobalAdmin,
+        isOrgAdmin,
+        organizationId: isGlobalAdmin ? null : currentOrgId,
+        roleId
+      })
+    })
+    .then(res => res.json())
+    .then(profile => {
+      setCurrentProfile(profile);
+    })
+    .catch(err => console.error('Failed to sync simulated profile context:', err));
+  }, [currentRole.id, currentOrgId, customRoles]);
+
+  // Fetch Isolated Tenant Data on Org Change
+  useEffect(() => {
+    if (!currentOrgId) return;
+
+    fetch(`${API_URL}/api/properties`, {
+      headers: { 'x-organization-id': currentOrgId }
+    })
+    .then(res => res.json())
+    .then(data => {
+      setProperties(data);
+    })
+    .catch(err => console.error('Failed to load isolated property records:', err));
+
+    fetch(`${API_URL}/api/tracker`, {
+      headers: { 'x-organization-id': currentOrgId }
+    })
+    .then(res => res.json())
+    .then(data => {
+      setTrackerItemsRaw(data);
+    })
+    .catch(err => console.error('Failed to load isolated tracker records:', err));
+  }, [currentOrgId]);
+
+  // Evaluate module write permission dynamically
+  const canEditModule = (moduleName: string) => {
+    if (currentProfile?.isGlobalAdmin || currentProfile?.isOrgAdmin) return true;
+    if (currentProfile?.role?.permissions) {
+      const perm = currentProfile.role.permissions.find((p: any) => p.module === moduleName);
+      return perm?.canEdit ?? false;
+    }
+    // Resident can edit 311 (Command Center) to submit, but not others
+    if (currentProfile && !currentProfile.roleId) {
+      return moduleName === 'command-center';
+    }
+    return false;
+  };
 
   const setTrackerItems: React.Dispatch<React.SetStateAction<TrackerItem[]>> = (value) => {
+    // Check permission before accepting write operation
+    if (!canEditModule('tracker') && activeModule === 'tracker') {
+      addNotification('Access Denied: Read-only profile constraint prevents modifying ticket status.');
+      return;
+    }
+
     setTrackerItemsRaw(prev => {
       const next = typeof value === 'function' ? (value as any)(prev) : value;
 
-      // Sync mutations to database backend Express server
       if (next.length > prev.length) {
-        // New item added (CommandCenter submits 311)
         const newItem = next[0];
         fetch(`${API_URL}/api/tracker`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-organization-id': currentOrgId 
+          },
           body: JSON.stringify({
             module: newItem.module,
             title: newItem.title,
@@ -68,13 +182,11 @@ function App() {
         })
         .then(res => res.json())
         .then(syncedItem => {
-          // Replace mock temporary item in state with actual synced item containing DB primary key UUID
           setTrackerItemsRaw(current => current.map(item => item.id === newItem.id ? syncedItem : item));
           addNotification(`Saved ticket ${syncedItem.id} to Supabase!`);
         })
         .catch(err => console.error('Failed to sync new ticket to Supabase', err));
       } else if (next.length === prev.length) {
-        // Item updated (UniversalTracker updates field values)
         next.forEach((newItem: any) => {
           const oldItem = prev.find(p => p.id === newItem.id);
           if (oldItem) {
@@ -85,7 +197,10 @@ function App() {
             ) {
               fetch(`${API_URL}/api/tracker/${newItem.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'x-organization-id': currentOrgId 
+                },
                 body: JSON.stringify({
                   status: newItem.status,
                   priority: newItem.priority,
@@ -109,8 +224,6 @@ function App() {
   const [legislativeItems, setLegislativeItems] = useState<LegislativeItem[]>(LEGISLATIVE_ITEMS);
   const [activePropertyId, setActivePropertyId] = useState<string | null>('prop_01');
   const [searchVal, setSearchVal] = useState('');
-
-  // Toast Stack state
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const addNotification = (text: string) => {
@@ -121,7 +234,6 @@ function App() {
     }, 4000);
   };
 
-  // Switch role handler
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const roleId = e.target.value;
     const selectedRole = USER_ROLES[roleId];
@@ -131,16 +243,14 @@ function App() {
     }
   };
 
-  // Open Chart in persistent workspace
   const handleOpenChart = (type: 'property' | 'permit' | 'legislative' | 'business', id: string) => {
     let label = id;
     if (type === 'property') {
-      label = PROPERTIES[id]?.address.split(',')[0] || id;
+      label = properties[id]?.address.split(',')[0] || id;
     } else if (type === 'permit') {
       label = PERMITS[id]?.permitNumber || id;
     }
 
-    // Add tab if it doesn't exist
     setChartTabs(prev => {
       const exists = prev.some(tab => tab.id === id);
       if (exists) return prev;
@@ -155,12 +265,10 @@ function App() {
     addNotification(`Opened Workspace Chart: ${label}`);
   };
 
-  // Close tab handler
   const handleCloseTab = (id: string) => {
     setChartTabs(prev => {
       const filtered = prev.filter(tab => tab.id !== id);
       if (activeChartTabId === id) {
-        // Select last tab or reset
         if (filtered.length > 0) {
           setActiveChartTabId(filtered[filtered.length - 1].id);
         } else {
@@ -172,15 +280,13 @@ function App() {
     });
   };
 
-  // Global search parsing
   const handleGlobalSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchVal.trim()) return;
 
     const term = searchVal.toLowerCase();
 
-    // Check properties
-    const matchedProp = Object.values(PROPERTIES).find(p => 
+    const matchedProp = Object.values(properties).find(p => 
       p.address.toLowerCase().includes(term) || p.ownerName.toLowerCase().includes(term)
     );
     if (matchedProp) {
@@ -189,7 +295,6 @@ function App() {
       return;
     }
 
-    // Check permits
     const matchedPerm = Object.values(PERMITS).find(p => 
       p.permitNumber.toLowerCase().includes(term)
     );
@@ -202,9 +307,8 @@ function App() {
     addNotification(`Universal search: no exact record matches found for "${searchVal}"`);
   };
 
-  // Cross-module property locator
   const handleOpenPropertyByAddress = (address: string) => {
-    const matched = Object.values(PROPERTIES).find(p => p.address === address);
+    const matched = Object.values(properties).find(p => p.address === address);
     if (matched) {
       handleOpenChart('property', matched.id);
     } else {
@@ -212,25 +316,30 @@ function App() {
     }
   };
 
-  // Dynamic updates of permits (e.g. Inspector approves/fails work)
   const handleUpdatePermit = (id: string, updated: Partial<PermitRecord>) => {
-    // In a real DB we'd update, here we just mock the update logs in notification
+    if (!canEditModule('permits')) {
+      addNotification('Access Denied: Read-only profile constraint prevents modifying permits.');
+      return;
+    }
     addNotification(`Permit ${id} workflow updated: ${updated.status}`);
   };
 
   const handleUpdateInspection = (id: string, updated: Partial<InspectionRecord>) => {
+    if (!canEditModule('code-enforcement')) {
+      addNotification('Access Denied: Read-only profile constraint prevents modifying inspections.');
+      return;
+    }
     if (INSPECTIONS[id]) {
       INSPECTIONS[id] = { ...INSPECTIONS[id], ...updated } as any;
+      addNotification(`Inspection ${id} successfully signed off!`);
     }
   };
 
-  // Extract map pins based on current operations state
   const getMapPins = () => {
     const pins: { id: string; label: string; coords: [number, number]; type: 'permit' | 'violation' | 'request' }[] = [];
     
-    // Add open code violations
     Object.values(VIOLATIONS).forEach(v => {
-      const prop = PROPERTIES[v.propertyId];
+      const prop = properties[v.propertyId];
       if (prop && v.status !== 'Abated') {
         pins.push({
           id: v.caseNumber,
@@ -241,9 +350,8 @@ function App() {
       }
     });
 
-    // Add active 311 tickets
     trackerItems.filter(item => item.module === '311' && item.status !== 'Resolved').forEach(item => {
-      const prop = Object.values(PROPERTIES).find(p => p.address === item.address);
+      const prop = Object.values(properties).find(p => p.address === item.address);
       if (prop) {
         pins.push({
           id: item.id,
@@ -261,7 +369,6 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar Navigation */}
       <Sidebar 
         activeModule={activeModule}
         setActiveModule={(mod) => {
@@ -271,11 +378,10 @@ function App() {
         currentRole={currentRole}
         tenant={tenant}
         setTenant={setTenant}
+        currentProfile={currentProfile}
       />
 
-      {/* Main Panel */}
       <main className="main-panel">
-        {/* Top Header */}
         <header className="dashboard-header">
           <form onSubmit={handleGlobalSearch} className="header-search">
             <input 
@@ -288,7 +394,6 @@ function App() {
           </form>
 
           <div className="header-actions">
-            {/* Split workspace toggle */}
             {chartTabs.length > 0 && (
               <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
                 <button 
@@ -322,17 +427,16 @@ function App() {
               </div>
             )}
 
-            {/* Role Switcher */}
             <div className="role-switcher-container">
               <span className="role-switcher-label">GovOS Session:</span>
               <select className="role-select" value={currentRole.id} onChange={handleRoleChange}>
                 <option value="mayor">Mayor / City Manager</option>
                 <option value="inspector">Building Inspector</option>
                 <option value="resident">Resident (MyMunevo)</option>
+                <option value="global_admin">Global Administrator</option>
               </select>
             </div>
 
-            {/* Notification Indicator */}
             <div className="notification-bell" onClick={() => addNotification('System audit logs are fully synced.')}>
               <Bell size={18} />
               <div className="notification-badge" />
@@ -340,12 +444,10 @@ function App() {
           </div>
         </header>
 
-        {/* Workspace Canvas (Module OR Chart split + AI Panel) */}
         <div className="workspace-canvas">
           <div className="pane-left">
             {viewMode === 'module' ? (
               <>
-                {/* CommandCenter module */}
                 {activeModule === 'command-center' && (
                   <CommandCenter 
                     currentRole={currentRole}
@@ -355,20 +457,20 @@ function App() {
                     addNotification={addNotification}
                     onUpdatePermit={handleUpdatePermit}
                     onUpdateInspection={handleUpdateInspection}
+                    canEdit={canEditModule('command-center')}
                   />
                 )}
 
-                {/* Universal Tracker Module */}
                 {activeModule === 'tracker' && (
                   <UniversalTracker 
                     trackerItems={trackerItems}
                     setTrackerItems={setTrackerItems}
                     onOpenChart={handleOpenChart}
                     onOpenPropertyByAddress={handleOpenPropertyByAddress}
+                    canEdit={canEditModule('tracker')}
                   />
                 )}
 
-                {/* GIS Map Module */}
                 {activeModule === 'gis' && (
                   <GisMap 
                     activePropertyId={activePropertyId}
@@ -382,51 +484,62 @@ function App() {
                   />
                 )}
 
-                {/* Permits Hub Module */}
                 {activeModule === 'permits' && (
                   <div className="glass-card">
-                    <div className="card-header">
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div className="card-title">Permits & Licensing Desk</div>
+                      {!canEditModule('permits') && (
+                        <span style={{ fontSize: '11px', color: 'var(--warning-text)', padding: '2px 8px', background: 'rgba(245,158,11,0.1)', borderRadius: '4px' }}>
+                          Read-Only Access
+                        </span>
+                      )}
                     </div>
                     <div className="list-queue">
-                      {Object.values(PERMITS).map(p => (
-                        <div key={p.id} className="queue-item" onClick={() => handleOpenChart('permit', p.id)}>
-                          <div className="queue-details">
-                            <span className="queue-title">{p.permitNumber} ({p.type})</span>
-                            <span className="queue-sub">{PROPERTIES[p.propertyId]?.address} • Cost: ${p.estimatedCost.toLocaleString()}</span>
+                      {Object.values(properties).flatMap((p: any) => 
+                        Object.values(PERMITS).filter((perm: any) => perm.propertyId === p.id).map(pPerm => (
+                          <div key={pPerm.id} className="queue-item" onClick={() => handleOpenChart('permit', pPerm.id)}>
+                            <div className="queue-details">
+                              <span className="queue-title">{pPerm.permitNumber} ({pPerm.type})</span>
+                              <span className="queue-sub">{p.address} • Cost: ${pPerm.estimatedCost.toLocaleString()}</span>
+                            </div>
+                            <span className={`badge-status ${pPerm.status === 'Completed' ? 'badge-success' : 'badge-primary'}`}>
+                              {pPerm.status}
+                            </span>
                           </div>
-                          <span className={`badge-status ${p.status === 'Completed' ? 'badge-success' : 'badge-primary'}`}>
-                            {p.status}
-                          </span>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Code Enforcement Hub Module */}
                 {activeModule === 'code-enforcement' && (
                   <div className="glass-card">
-                    <div className="card-header">
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div className="card-title">Code Enforcement Case Files</div>
+                      {!canEditModule('code-enforcement') && (
+                        <span style={{ fontSize: '11px', color: 'var(--warning-text)', padding: '2px 8px', background: 'rgba(245,158,11,0.1)', borderRadius: '4px' }}>
+                          Read-Only Access
+                        </span>
+                      )}
                     </div>
                     <div className="list-queue">
-                      {Object.values(VIOLATIONS).map(v => (
-                        <div key={v.id} className="queue-item" onClick={() => handleOpenChart('property', v.propertyId)}>
-                          <div className="queue-details">
-                            <span className="queue-title" style={{ color: 'var(--danger-text)' }}>{v.caseNumber} • {v.violationType}</span>
-                            <span className="queue-sub">{PROPERTIES[v.propertyId]?.address} • Fines: ${v.fineAmount}</span>
+                      {Object.values(properties).flatMap((p: any) => 
+                        Object.values(VIOLATIONS).filter((v: any) => v.propertyId === p.id).map(pViol => (
+                          <div key={pViol.id} className="queue-item" onClick={() => handleOpenChart('property', pViol.propertyId)}>
+                            <div className="queue-details">
+                              <span className="queue-title" style={{ color: 'var(--danger-text)' }}>{pViol.caseNumber} • {pViol.violationType}</span>
+                              <span className="queue-sub">{p.address} • Fines: ${pViol.fineAmount}</span>
+                            </div>
+                            <span className="badge-status badge-danger">
+                              {pViol.status}
+                            </span>
                           </div>
-                          <span className="badge-status badge-danger">
-                            {v.status}
-                          </span>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Legislative Agenda Hub */}
                 {activeModule === 'legislative' && (
                   <LegislativeHub 
                     legislativeItems={legislativeItems}
@@ -436,7 +549,6 @@ function App() {
                   />
                 )}
 
-                {/* Identity & Security Administration Console */}
                 {activeModule === 'identity-security' && (
                   <IdentityConsole 
                     currentRole={currentRole}
@@ -447,9 +559,22 @@ function App() {
                     addNotification={addNotification}
                   />
                 )}
+
+                {activeModule === 'global-admin' && (
+                  <GlobalAdminConsole 
+                    currentProfile={currentProfile}
+                    addNotification={addNotification}
+                  />
+                )}
+
+                {activeModule === 'org-admin' && (
+                  <OrgAdminConsole 
+                    currentProfile={currentProfile}
+                    addNotification={addNotification}
+                  />
+                )}
               </>
             ) : (
-              /* Epic-inspired Workspace active tab view */
               <ChartingSystem 
                 tabs={chartTabs}
                 activeTabId={activeChartTabId}
@@ -460,7 +585,6 @@ function App() {
             )}
           </div>
 
-          {/* AI Panel context engine */}
           <AiPanel 
             currentRole={currentRole}
             activeChartTab={activeChartTab}
@@ -469,7 +593,6 @@ function App() {
         </div>
       </main>
 
-      {/* Toast Notification Container */}
       <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {toasts.map(toast => (
           <div key={toast.id} className="toast">

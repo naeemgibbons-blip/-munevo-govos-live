@@ -15,17 +15,33 @@ app.use((req, res, next) => {
   next();
 });
 
-// 1. GET: Fetch all properties (with permits & inspections)
+// Helper: Resolve Newark organization ID as standard fallback
+async function getNewarkOrgId() {
+  const newark = await prisma.organization.findUnique({
+    where: { slug: 'newark' }
+  });
+  return newark?.id || '';
+}
+
+// 1. GET: Fetch all properties (filtered by organization)
 app.get('/api/properties', async (req, res) => {
   try {
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    
+    if (!orgId) {
+      orgId = await getNewarkOrgId();
+    }
+
     const properties = await prisma.property.findMany({
+      where: {
+        organizationId: orgId
+      },
       include: {
         permits: true,
         inspections: true
       }
     });
 
-    // Structure properties into key-value records mapping mockData style
     const propertyRecords: Record<string, any> = {};
     properties.forEach((p) => {
       propertyRecords[p.id] = {
@@ -39,7 +55,7 @@ app.get('/api/properties', async (req, res) => {
         notes: p.notes,
         permits: p.permits.map((perm) => perm.id),
         inspections: p.inspections.map((insp) => insp.id),
-        violations: [], // Standard fallback mock array
+        violations: [], 
         utilities: {
           waterAccountNumber: `W-${p.id.replace('prop_', '')}-092`,
           balance: p.taxStatus === 'Delinquent' ? 620.00 : 0.00,
@@ -68,10 +84,19 @@ app.get('/api/properties', async (req, res) => {
   }
 });
 
-// 2. GET: Fetch all Universal Tracker items
+// 2. GET: Fetch all Universal Tracker items (filtered by organization)
 app.get('/api/tracker', async (req, res) => {
   try {
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    
+    if (!orgId) {
+      orgId = await getNewarkOrgId();
+    }
+
     const trackerItems = await prisma.trackerItem.findMany({
+      where: {
+        organizationId: orgId
+      },
       orderBy: {
         reportedDate: 'desc'
       },
@@ -80,9 +105,7 @@ app.get('/api/tracker', async (req, res) => {
       }
     });
 
-    // Reconstruct into mockData structure containing default comments & history logs
     const formatted = trackerItems.map((item) => {
-      // Map mock comments/history logs based on ID
       return {
         id: item.id,
         module: item.module,
@@ -116,20 +139,27 @@ app.get('/api/tracker', async (req, res) => {
   }
 });
 
-// 3. POST: Create a new operation tracker item (e.g. 311 citizen report)
+// 3. POST: Create a new operation tracker item
 app.post('/api/tracker', async (req, res) => {
   try {
     const { module, title, status, priority, assignedTo, slaDays, address } = req.body;
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    
+    if (!orgId) {
+      orgId = await getNewarkOrgId();
+    }
 
-    // Resolve propertyId from address
     let property = await prisma.property.findFirst({
-      where: { address }
+      where: { 
+        address,
+        organizationId: orgId
+      }
     });
 
-    // If property doesn't exist, create it (e.g. 255 Leon Avenue geocoded)
     if (!property) {
       property = await prisma.property.create({
         data: {
+          organizationId: orgId,
           address,
           zipCode: '07103',
           ownerName: 'Municipal Redevelopment Board',
@@ -142,6 +172,7 @@ app.post('/api/tracker', async (req, res) => {
 
     const newItem = await prisma.trackerItem.create({
       data: {
+        organizationId: orgId,
         module,
         title,
         status,
@@ -183,7 +214,7 @@ app.post('/api/tracker', async (req, res) => {
   }
 });
 
-// 4. PUT: Update a tracker item field (e.g. status, priority, assignee)
+// 4. PUT: Update a tracker item field
 app.put('/api/tracker/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -227,6 +258,221 @@ app.put('/api/tracker/:id', async (req, res) => {
   } catch (error: any) {
     console.error('Error updating tracker item:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 5. GET /api/organizations: List all organizations
+app.get('/api/organizations', async (req, res) => {
+  try {
+    const orgs = await prisma.organization.findMany();
+    res.json(orgs);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. POST /api/organizations: Create a new organization
+app.post('/api/organizations', async (req, res) => {
+  const { name, slug } = req.body;
+  try {
+    const org = await prisma.organization.create({
+      data: { name, slug }
+    });
+    res.status(201).json(org);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. GET /api/invites: List invites
+app.get('/api/invites', async (req, res) => {
+  const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    const invites = await prisma.invite.findMany({
+      where: orgId ? { organizationId: orgId } : {},
+      include: {
+        organization: true,
+        role: true,
+        invitedBy: true
+      }
+    });
+    res.json(invites);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. POST /api/invites: Create pending user invitation
+app.post('/api/invites', async (req, res) => {
+  const { email, isOrgAdmin, roleId, organizationId, invitedById } = req.body;
+  try {
+    const invite = await prisma.invite.create({
+      data: {
+        email,
+        isOrgAdmin: !!isOrgAdmin,
+        roleId: roleId || null,
+        organizationId: organizationId || null,
+        invitedById,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days expiration
+      }
+    });
+    res.status(201).json(invite);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9. GET /api/profiles: Get profiles list
+app.get('/api/profiles', async (req, res) => {
+  const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    const profiles = await prisma.profile.findMany({
+      where: orgId ? { organizationId: orgId } : {},
+      include: {
+        organization: true,
+        role: true
+      }
+    });
+    res.json(profiles);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10. POST /api/profiles/sync: Upsert a simulated profile for client login testing
+app.post('/api/profiles/sync', async (req, res) => {
+  const { id, email, isGlobalAdmin, isOrgAdmin, organizationId, roleId } = req.body;
+  try {
+    let org = null;
+    if (organizationId) {
+      org = await prisma.organization.findUnique({
+        where: { id: organizationId }
+      });
+    }
+
+    let role = null;
+    if (roleId) {
+      role = await prisma.customRole.findUnique({
+        where: { id: roleId }
+      });
+    }
+
+    const profile = await prisma.profile.upsert({
+      where: { id },
+      update: {
+        email,
+        isGlobalAdmin: !!isGlobalAdmin,
+        isOrgAdmin: !!isOrgAdmin,
+        organizationId: org ? organizationId : null,
+        roleId: role ? roleId : null
+      },
+      create: {
+        id,
+        email,
+        isGlobalAdmin: !!isGlobalAdmin,
+        isOrgAdmin: !!isOrgAdmin,
+        organizationId: org ? organizationId : null,
+        roleId: role ? roleId : null
+      },
+      include: {
+        organization: true,
+        role: {
+          include: { permissions: true }
+        }
+      }
+    });
+    res.json(profile);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 11. GET /api/custom-roles: List custom roles
+app.get('/api/custom-roles', async (req, res) => {
+  const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    const roles = await prisma.customRole.findMany({
+      where: orgId ? { organizationId: orgId } : {},
+      include: {
+        permissions: true
+      }
+    });
+    res.json(roles);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 12. POST /api/custom-roles: Create role with custom permissions matrix
+app.post('/api/custom-roles', async (req, res) => {
+  const { name, permissions } = req.body;
+  const orgId = req.headers['x-organization-id'] as string;
+  
+  if (!orgId) {
+    return res.status(400).json({ error: 'x-organization-id header is required' });
+  }
+  
+  try {
+    const newRole = await prisma.customRole.create({
+      data: {
+        organizationId: orgId,
+        name
+      }
+    });
+    
+    if (permissions && Array.isArray(permissions)) {
+      const permissionData = permissions.map((p: any) => ({
+        roleId: newRole.id,
+        module: p.module,
+        canView: !!p.canView,
+        canEdit: !!p.canEdit
+      }));
+      await prisma.permission.createMany({
+        data: permissionData
+      });
+    }
+    
+    const roleWithPermissions = await prisma.customRole.findUnique({
+      where: { id: newRole.id },
+      include: { permissions: true }
+    });
+    
+    res.status(201).json(roleWithPermissions);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 13. PUT /api/custom-roles/:id/permissions: Update role permissions
+app.put('/api/custom-roles/:id/permissions', async (req, res) => {
+  const { id } = req.params;
+  const { permissions } = req.body;
+  
+  try {
+    await prisma.permission.deleteMany({
+      where: { roleId: id }
+    });
+    
+    if (permissions && Array.isArray(permissions)) {
+      const permissionData = permissions.map((p: any) => ({
+        roleId: id,
+        module: p.module,
+        canView: !!p.canView,
+        canEdit: !!p.canEdit
+      }));
+      await prisma.permission.createMany({
+        data: permissionData
+      });
+    }
+    
+    const updatedRole = await prisma.customRole.findUnique({
+      where: { id },
+      include: { permissions: true }
+    });
+    
+    res.json(updatedRole);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

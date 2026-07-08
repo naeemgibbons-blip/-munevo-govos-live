@@ -39,6 +39,7 @@ interface CommandCenterProps {
   // Callback when a permit/violation is updated
   onUpdatePermit: (id: string, updated: Partial<PermitRecord>) => void;
   onUpdateInspection: (id: string, updated: Partial<InspectionRecord>) => void;
+  canEdit?: boolean;
 }
 
 export const CommandCenter: React.FC<CommandCenterProps> = ({
@@ -48,7 +49,8 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   setTrackerItems,
   addNotification,
   onUpdatePermit,
-  onUpdateInspection
+  onUpdateInspection,
+  canEdit = true
 }) => {
   // Local states for forms
   const [newRequestAddress, setNewRequestAddress] = useState('42 Ferry St, Newark, NJ');
@@ -364,11 +366,16 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           {/* Submit 311 Request */}
           <div className="glass-card">
-            <div className="card-header">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div className="card-title">
                 <Plus size={16} />
                 <span>Submit a 311 Service Request</span>
               </div>
+              {!canEdit && (
+                <span style={{ fontSize: '10px', color: 'var(--warning-text)', padding: '2px 8px', background: 'rgba(245,158,11,0.1)', borderRadius: '4px' }}>
+                  Locked
+                </span>
+              )}
             </div>
 
             <form onSubmit={handleSubmit311} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -378,6 +385,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                   className="select-filter" 
                   value={newRequestAddress} 
                   onChange={(e) => setNewRequestAddress(e.target.value)}
+                  disabled={!canEdit}
                 >
                   {Object.values(PROPERTIES).map(p => (
                     <option key={p.id} value={p.address}>{p.address}</option>
@@ -391,6 +399,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                   className="select-filter" 
                   value={newRequestType} 
                   onChange={(e) => setNewRequestType(e.target.value)}
+                  disabled={!canEdit}
                 >
                   <option value="Trash & Debris">Trash & Debris</option>
                   <option value="Water Pressure / Leak">Water Pressure & Leak</option>
@@ -404,14 +413,15 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                 <textarea
                   className="ai-input"
                   style={{ minHeight: '70px', width: '100%' }}
-                  placeholder="Describe the issue you noticed..."
+                  placeholder={canEdit ? "Describe the issue you noticed..." : "Submissions are currently locked."}
                   value={newRequestDesc}
                   onChange={(e) => setNewRequestDesc(e.target.value)}
                   required
+                  disabled={!canEdit}
                 />
               </div>
 
-              <button type="submit" className="ai-btn-send" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button type="submit" className="ai-btn-send" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }} disabled={!canEdit}>
                 <Send size={12} />
                 <span>Submit 311 Ticket</span>
               </button>

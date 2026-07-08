@@ -122,6 +122,22 @@ export const USER_ROLES: Record<string, UserRole> = {
       ],
       sections: ['Today\'s Work Dispatch Queue', 'Municipal Fleet GPS & Assets Status', 'Utilities GIS Work Orders Map', 'Snow & Sanitation Routes Coordinator']
     }
+  },
+  global_admin: {
+    id: 'global_admin',
+    name: 'Global Administrator',
+    department: 'Multi-Tenant Infrastructure',
+    description: 'Create new municipalities, view cross-tenant directory indexes, and invite tenant administrators.',
+    commandCenter: {
+      actions: ['Provision New Tenant', 'Audit Active Orgs', 'Invite Tenant Admin', 'Database Maintenance'],
+      metrics: [
+        { label: 'Total Municipalities', value: '2 Active', status: 'normal' },
+        { label: 'Active Users (Total)', value: '14 Accounts', status: 'normal' },
+        { label: 'Pending Invitations', value: '3 Active', status: 'warn' },
+        { label: 'Global DB Row Count', value: '42 Rows', status: 'normal' }
+      ],
+      sections: ['Organization Registry Status', 'Global Audit Trail Log', 'Direct Cloud Management Settings']
+    }
   }
 };
 
@@ -786,7 +802,7 @@ export const LEGISLATIVE_ITEMS: LegislativeItem[] = [
   }
 ];
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = (typeof import.meta !== 'undefined' && import.meta.env) ? (import.meta.env.VITE_API_URL || 'http://localhost:3001') : 'http://localhost:3001';
 
 let fetchedProperties = MOCK_PROPERTIES;
 let fetchedTracker = MOCK_TRACKER_ITEMS;

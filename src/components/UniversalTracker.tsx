@@ -21,13 +21,15 @@ interface UniversalTrackerProps {
   setTrackerItems: React.Dispatch<React.SetStateAction<TrackerItem[]>>;
   onOpenChart: (type: 'property' | 'permit' | 'legislative' | 'business', id: string) => void;
   onOpenPropertyByAddress: (address: string) => void;
+  canEdit?: boolean;
 }
 
 export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
   trackerItems,
   setTrackerItems,
   onOpenChart,
-  onOpenPropertyByAddress
+  onOpenPropertyByAddress,
+  canEdit = true
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [moduleFilter, setModuleFilter] = useState('All');
@@ -288,6 +290,11 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span className="badge-status badge-success" style={{ fontSize: '0.65rem' }}>{selectedItem.module} module</span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {selectedItem.id}</span>
+                {!canEdit && (
+                  <span style={{ fontSize: '10px', color: 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(245,158,11,0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+                    Locked
+                  </span>
+                )}
               </div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: '6px' }}>{selectedItem.title}</h3>
             </div>
@@ -309,6 +316,7 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
                 style={{ width: '100%' }}
                 value={selectedItem.status} 
                 onChange={(e) => updateTrackerField(selectedItem.id, 'status', e.target.value)}
+                disabled={!canEdit}
               >
                 <option value="Open">Open</option>
                 <option value="In Progress">In Progress</option>
@@ -327,6 +335,7 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
                 style={{ width: '100%' }}
                 value={selectedItem.priority} 
                 onChange={(e) => updateTrackerField(selectedItem.id, 'priority', e.target.value)}
+                disabled={!canEdit}
               >
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>
@@ -343,6 +352,7 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
                 style={{ width: '100%' }}
                 value={selectedItem.assignedTo} 
                 onChange={(e) => updateTrackerField(selectedItem.id, 'assignedTo', e.target.value)}
+                disabled={!canEdit}
               >
                 <option value="Marcus Miller">Marcus Miller</option>
                 <option value="Elena Rostova">Elena Rostova</option>
