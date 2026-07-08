@@ -69,6 +69,7 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
+  const [claims, setClaims] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Custom Role Form States
@@ -98,19 +99,22 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
     if (!orgId) return;
     try {
       setLoading(true);
-      const [resRoles, resProfiles, resInvites] = await Promise.all([
+      const [resRoles, resProfiles, resInvites, resClaims] = await Promise.all([
         fetch(`${API_URL}/api/custom-roles`, { headers: { 'x-organization-id': orgId } }),
         fetch(`${API_URL}/api/profiles?orgId=${orgId}`),
-        fetch(`${API_URL}/api/invites?orgId=${orgId}`)
+        fetch(`${API_URL}/api/invites?orgId=${orgId}`),
+        fetch(`${API_URL}/api/claims`, { headers: { 'x-organization-id': orgId } })
       ]);
 
       const rolesData = await resRoles.json();
       const profilesData = await resProfiles.json();
       const invitesData = await resInvites.json();
+      const claimsData = await resClaims.json();
 
       setCustomRoles(rolesData);
       setProfiles(profilesData);
       setInvites(invitesData);
+      setClaims(claimsData);
     } catch (err) {
       console.error('Failed to load org admin board:', err);
       addNotification('API Error: Offline context.');
@@ -122,6 +126,28 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
   useEffect(() => {
     fetchTenantData();
   }, [orgId]);
+
+  const handleReviewClaim = async (claimId: string, status: 'VERIFIED' | 'REJECTED') => {
+    try {
+      const res = await fetch(`${API_URL}/api/claims/${claimId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-organization-id': orgId
+        },
+        body: JSON.stringify({ status, reviewedBy: currentProfile?.id })
+      });
+      if (res.ok) {
+        addNotification(`Claim successfully ${status.toLowerCase()}!`);
+        fetchTenantData();
+      } else {
+        addNotification('Failed to update claim status.');
+      }
+    } catch (err) {
+      console.error(err);
+      addNotification('API Error updating claim.');
+    }
+  };
 
   // Handlers
   const handleTogglePermission = (moduleId: string, type: 'canView' | 'canEdit') => {
@@ -439,6 +465,54 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
                   <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', padding: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', overflowX: 'auto' }}>
                     Token: {inv.token}
                   </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* List 4: Property/Project Verification Claims Queue */}
+        <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <Building className="text-emerald-500" size={18} />
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Verification Claims Queue ({claims.length})</h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto' }}>
+            {claims.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No verification claims submitted.</div>
+            ) : (
+              claims.map(claim => (
+                <div key={claim.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#fff' }}>{claim.targetAddress}</span>
+                    <span className={`badge-status ${claim.status === 'VERIFIED' ? 'badge-success' : claim.status === 'REJECTED' ? 'badge-danger' : 'badge-warn'}`} style={{ fontSize: '9px' }}>
+                      {claim.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Claimant: <strong>{claim.profile?.email || 'Resident'}</strong> ({claim.type.replace('_', ' ')})
+                  </div>
+                  {claim.notes && (
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', padding: '6px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px', fontStyle: 'italic' }}>
+                      "{claim.notes}"
+                    </div>
+                  )}
+                  {claim.status === 'PENDING' && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', justifyContent: 'flex-end' }}>
+                      <button 
+                        onClick={() => handleReviewClaim(claim.id, 'REJECTED')}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontSize: '10px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '4px', color: 'var(--danger-text)', cursor: 'pointer' }}
+                      >
+                        <X size={10} /> Reject
+                      </button>
+                      <button 
+                        onClick={() => handleReviewClaim(claim.id, 'VERIFIED')}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontSize: '10px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '4px', color: 'var(--success-text)', cursor: 'pointer' }}
+                      >
+                        <Check size={10} /> Verify & Link
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}

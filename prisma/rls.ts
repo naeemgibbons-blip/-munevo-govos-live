@@ -107,6 +107,14 @@ ALTER TABLE public."Timesheet" ENABLE ROW LEVEL SECURITY;
 -- SPLIT --
 ALTER TABLE public."AuditLog" ENABLE ROW LEVEL SECURITY;
 -- SPLIT --
+ALTER TABLE public."MunicipalOffice" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
+ALTER TABLE public."VerificationClaim" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
+ALTER TABLE public."Appointment" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
+ALTER TABLE public."CaseComment" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
 -- 5. Drop existing policies to prevent conflicts on execution rerun
 DROP POLICY IF EXISTS organization_policy ON public."Organization";
 -- SPLIT --
@@ -179,6 +187,14 @@ DROP POLICY IF EXISTS timesheet_select_policy ON public."Timesheet";
 DROP POLICY IF EXISTS timesheet_modify_policy ON public."Timesheet";
 -- SPLIT --
 DROP POLICY IF EXISTS audit_log_policy ON public."AuditLog";
+-- SPLIT --
+DROP POLICY IF EXISTS office_policy ON public."MunicipalOffice";
+-- SPLIT --
+DROP POLICY IF EXISTS claim_policy ON public."VerificationClaim";
+-- SPLIT --
+DROP POLICY IF EXISTS appointment_policy ON public."Appointment";
+-- SPLIT --
+DROP POLICY IF EXISTS comment_policy ON public."CaseComment";
 -- SPLIT --
 -- 6. Define Organization Policies
 CREATE POLICY organization_policy ON public."Organization"
@@ -477,7 +493,7 @@ USING (
   )
 );
 -- SPLIT --
--- 21. Define AuditLog Policies (Write/Read linked to identity-security view checks)
+-- 21. Define AuditLog Policies
 CREATE POLICY audit_log_policy ON public."AuditLog"
 FOR ALL
 USING (
@@ -491,10 +507,46 @@ USING (
 WITH CHECK (
   true
 );
+-- SPLIT --
+-- 22. Define MunicipalOffice Policies
+CREATE POLICY office_policy ON public."MunicipalOffice"
+FOR ALL
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+);
+-- SPLIT --
+-- 23. Define VerificationClaim Policies (Residents can insert, Admins manage)
+CREATE POLICY claim_policy ON public."VerificationClaim"
+FOR ALL
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+);
+-- SPLIT --
+-- 24. Define Appointment Policies
+CREATE POLICY appointment_policy ON public."Appointment"
+FOR ALL
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+);
+-- SPLIT --
+-- 25. Define CaseComment Policies
+CREATE POLICY comment_policy ON public."CaseComment"
+FOR ALL
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+);
 `;
 
 async function main() {
-  console.log("Applying Supabase auth trigger & split custom RBAC RLS policies...");
+  console.log("Applying Supabase auth trigger & custom RLS policies for new tables...");
   
   const statements = sql
     .split('-- SPLIT --')
@@ -511,7 +563,7 @@ async function main() {
     }
   }
 
-  console.log("Supabase split custom RBAC RLS policies successfully applied to the database!");
+  console.log("Supabase custom RLS policies successfully applied to the database!");
 }
 
 main()

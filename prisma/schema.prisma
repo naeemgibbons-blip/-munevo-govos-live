@@ -28,6 +28,10 @@ model Organization {
   openRecordsRequests OpenRecordsRequest[]
   employees           Employee[]
   auditLogs           AuditLog[]
+  municipalOffices    MunicipalOffice[]
+  verificationClaims  VerificationClaim[]
+  appointments        Appointment[]
+  caseComments        CaseComment[]
 }
 
 // 2. Custom Role System (Isolated Per Org)
@@ -63,6 +67,7 @@ model Permission {
 model Profile {
   id             String        @id // Maps to Supabase auth.users.id
   email          String        @unique
+  badgeId        String?       @unique // Optional alternate fast tap-card login credentials
   
   // Platform Permissions
   isGlobalAdmin  Boolean       @default(false)
@@ -76,9 +81,14 @@ model Profile {
   roleId         String?       
   role           CustomRole?   @relation(fields: [roleId], references: [id])
   
+  // Branch/Office Association (Optional District for residents)
+  districtOfficeId String?
+  districtOffice   MunicipalOffice? @relation(fields: [districtOfficeId], references: [id])
+  
   createdAt      DateTime      @default(now())
   sentInvites    Invite[]      @relation("InvitedBy")
   employee       Employee?
+  verificationClaims VerificationClaim[]
 }
 
 // 5. Invitations Flow (Invite-Only)
@@ -180,6 +190,12 @@ model TrackerItem {
   reportedDate   DateTime       @default(now())
   propertyId     String
   property       Property       @relation(fields: [propertyId], references: [id])
+  
+  // Office associations: origin branch & target processing branch
+  originOfficeId String?
+  originOffice   MunicipalOffice? @relation("OriginOffice", fields: [originOfficeId], references: [id])
+  targetOfficeId String?
+  targetOffice   MunicipalOffice? @relation("TargetOffice", fields: [targetOfficeId], references: [id])
 }
 
 // 6. Open Records (FOIA-style Requests)
@@ -198,7 +214,7 @@ model OpenRecordsRequest {
   updatedAt      DateTime     @updatedAt
 }
 
-// 7. NEW MODEL: Employee (Staff Directory)
+// 7. Employee (Staff Directory)
 model Employee {
   id             String          @id @default(uuid())
   organizationId String
@@ -212,12 +228,16 @@ model Employee {
   department     String          // "Code Enforcement" | "Public Works" | "City Clerk" etc.
   hireDate       DateTime
   
+  // Branch Office Affiliation (Staff/Aides)
+  officeId       String?
+  office         MunicipalOffice? @relation(fields: [officeId], references: [id])
+  
   // Relations
   certifications Certification[]
   timesheets     Timesheet[]
 }
 
-// 8. NEW MODEL: Staff Certifications
+// 8. Staff Certifications
 model Certification {
   id             String       @id @default(uuid())
   employeeId     String
@@ -229,7 +249,7 @@ model Certification {
   alertSent      Boolean      @default(false)
 }
 
-// 9. NEW MODEL: Simple Timesheet Tracker
+// 9. Simple Timesheet Tracker
 model Timesheet {
   id             String       @id @default(uuid())
   employeeId     String
@@ -239,7 +259,7 @@ model Timesheet {
   notes          String?
 }
 
-// 10. NEW MODEL: System-wide Audit Ledger
+// 10. System-wide Audit Ledger
 model AuditLog {
   id             String       @id @default(uuid())
   organizationId String
@@ -252,4 +272,85 @@ model AuditLog {
   oldValues      Json?
   newValues      Json?
   createdAt      DateTime     @default(now())
+}
+
+// 11. Municipal Branch / Office Model
+model MunicipalOffice {
+  id             String            @id @default(uuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  name           String            // e.g. "Mayor's Office", "Ward 1 Council Office"
+  branch         String            // "EXECUTIVE" | "LEGISLATIVE" | "JUDICIAL"
+  districtNumber String?           // e.g. "Ward 1" if council district-based
+  
+  // Relations
+  employees      Employee[]
+  profiles       Profile[]
+  appointments   Appointment[]
+  originTrackerItems TrackerItem[] @relation("OriginOffice")
+  targetTrackerItems TrackerItem[] @relation("TargetOffice")
+  caseComments   CaseComment[]
+}
+
+// 12. Property/Project Verification Claims (Self-Service)
+model VerificationClaim {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  type           String       // "RESIDENT_PROPERTY" | "CONTRACTOR_PROJECT" | "CONTRACTOR_PROPERTY"
+  targetId       String       // UUID of the Property or Project being claimed
+  targetAddress  String       // Human readable location address
+  notes          String?      // Optional upload details / validation notes
+  status         String       @default("PENDING") // "PENDING" | "VERIFIED" | "REJECTED"
+  
+  reviewedById   String?      
+  reviewedAt     DateTime?
+  createdAt      DateTime     @default(now())
+}
+
+// 13. Appointment Schedule
+model Appointment {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  requesterName  String
+  requesterEmail String
+  department     String       // "Mayor's Office" | "Zoning Board" etc.
+  scheduledAt    DateTime
+  purpose        String
+  
+  type           String       // "APPOINTMENT" | "WALK_IN"
+  status         String       @default("Scheduled") // "Scheduled" | "Completed" | "Cancelled"
+  
+  // Office mapping link
+  officeId       String?
+  office         MunicipalOffice? @relation(fields: [officeId], references: [id])
+  
+  // Optional link to operations tracker case if escalated
+  trackerItemId  String?
+  createdAt      DateTime     @default(now())
+}
+
+// 14. Unified In-Context Case Message / Comment Model
+model CaseComment {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  authorId       String           // Profile ID
+  authorName     String           // e.g. "Elena Rostova"
+  authorEmail    String
+  
+  authorOfficeId String?
+  authorOffice   MunicipalOffice? @relation(fields: [authorOfficeId], references: [id])
+  
+  recordType     String           // "Property" | "Permit" | "Inspection" | "TrackerItem" | "OpenRecordsRequest"
+  recordId       String           // Target row UUID
+  message        String
+  createdAt      DateTime         @default(now())
 }

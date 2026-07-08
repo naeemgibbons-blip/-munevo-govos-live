@@ -56,19 +56,11 @@ async function recordAudit(
 app.get('/api/properties', async (req, res) => {
   try {
     let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
-    
-    if (!orgId) {
-      orgId = await getNewarkOrgId();
-    }
+    if (!orgId) orgId = await getNewarkOrgId();
 
     const properties = await prisma.property.findMany({
-      where: {
-        organizationId: orgId
-      },
-      include: {
-        permits: true,
-        inspections: true
-      }
+      where: { organizationId: orgId },
+      include: { permits: true, inspections: true }
     });
 
     const propertyRecords: Record<string, any> = {};
@@ -117,21 +109,12 @@ app.get('/api/properties', async (req, res) => {
 app.get('/api/tracker', async (req, res) => {
   try {
     let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
-    
-    if (!orgId) {
-      orgId = await getNewarkOrgId();
-    }
+    if (!orgId) orgId = await getNewarkOrgId();
 
     const trackerItems = await prisma.trackerItem.findMany({
-      where: {
-        organizationId: orgId
-      },
-      orderBy: {
-        reportedDate: 'desc'
-      },
-      include: {
-        property: true
-      }
+      where: { organizationId: orgId },
+      orderBy: { reportedDate: 'desc' },
+      include: { property: true }
     });
 
     const formatted = trackerItems.map((item) => {
@@ -146,9 +129,7 @@ app.get('/api/tracker', async (req, res) => {
         slaProgress: item.slaProgress,
         reportedDate: item.reportedDate.toISOString().split('T')[0],
         address: item.property.address,
-        comments: [
-          { user: 'Elena Rostova', text: 'Zoning constraints audited and verified.', date: 'Recently' }
-        ],
+        comments: [],
         history: [
           { action: 'Record synchronised to Supabase DB', user: 'Prisma Client', date: 'Synced' }
         ],
@@ -176,9 +157,7 @@ app.post('/api/tracker', async (req, res) => {
     const userId = req.headers['x-user-id'] as string;
     const userEmail = req.headers['x-user-email'] as string;
     
-    if (!orgId) {
-      orgId = await getNewarkOrgId();
-    }
+    if (!orgId) orgId = await getNewarkOrgId();
 
     let property = await prisma.property.findFirst({
       where: { 
@@ -265,14 +244,8 @@ app.put('/api/tracker/:id', async (req, res) => {
 
     const updatedItem = await prisma.trackerItem.update({
       where: { id },
-      data: {
-        status,
-        priority,
-        assignedTo
-      },
-      include: {
-        property: true
-      }
+      data: { status, priority, assignedTo },
+      include: { property: true }
     });
 
     // Record in AuditLog
@@ -289,9 +262,7 @@ app.put('/api/tracker/:id', async (req, res) => {
       slaProgress: updatedItem.slaProgress,
       reportedDate: updatedItem.reportedDate.toISOString().split('T')[0],
       address: updatedItem.property.address,
-      comments: [
-        { user: 'Elena Rostova', text: 'Zoning constraints audited and verified.', date: 'Recently' }
-      ],
+      comments: [],
       history: [
         { action: `Fields updated dynamically: Status=${status}, Priority=${priority}`, user: 'Prisma client', date: 'Just now' }
       ],
@@ -604,10 +575,7 @@ app.post('/api/ai/suggest-routing', async (req, res) => {
 app.get('/api/open-records', async (req, res) => {
   try {
     let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
-    
-    if (!orgId) {
-      orgId = await getNewarkOrgId();
-    }
+    if (!orgId) orgId = await getNewarkOrgId();
 
     const requests = await prisma.openRecordsRequest.findMany({
       where: { organizationId: orgId },
@@ -628,9 +596,7 @@ app.post('/api/open-records', async (req, res) => {
     const userId = req.headers['x-user-id'] as string;
     const userEmail = req.headers['x-user-email'] as string;
     
-    if (!orgId) {
-      orgId = await getNewarkOrgId();
-    }
+    if (!orgId) orgId = await getNewarkOrgId();
 
     const newRequest = await prisma.openRecordsRequest.create({
       data: {
@@ -662,9 +628,7 @@ app.put('/api/open-records/:id', async (req, res) => {
     const userId = req.headers['x-user-id'] as string;
     const userEmail = req.headers['x-user-email'] as string;
 
-    if (!orgId) {
-      orgId = await getNewarkOrgId();
-    }
+    if (!orgId) orgId = await getNewarkOrgId();
 
     const oldRequest = await prisma.openRecordsRequest.findUnique({ where: { id } });
 
@@ -691,6 +655,7 @@ app.get('/api/employees', async (req, res) => {
     const employees = await prisma.employee.findMany({
       where: { organizationId: orgId },
       include: {
+        office: true,
         certifications: true,
         timesheets: {
           orderBy: { date: 'desc' }
@@ -771,9 +736,187 @@ app.get('/api/audit-logs', async (req, res) => {
     const logs = await prisma.auditLog.findMany({
       where: { organizationId: orgId },
       orderBy: { createdAt: 'desc' },
-      take: 100 // cap at 100 recent rows
+      take: 100
     });
     res.json(logs);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 22. POST /api/auth/badge-login: Tap Card Login endpoint
+app.post('/api/auth/badge-login', async (req, res) => {
+  const { badgeId } = req.body;
+  if (!badgeId) return res.status(400).json({ error: 'badgeId credentials are required' });
+  try {
+    const profile = await prisma.profile.findUnique({
+      where: { badgeId },
+      include: {
+        organization: true,
+        role: { include: { permissions: true } }
+      }
+    });
+    if (!profile) return res.status(404).json({ error: 'TAP CARD ID not registered.' });
+    res.json(profile);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 23. GET /api/claims: Fetch Verification Claims
+app.get('/api/claims', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const claims = await prisma.verificationClaim.findMany({
+      where: { organizationId: orgId },
+      include: { profile: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(claims);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 24. POST /api/claims: File a property verification claim
+app.post('/api/claims', async (req, res) => {
+  const { profileId, type, targetId, targetAddress, notes } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const claim = await prisma.verificationClaim.create({
+      data: {
+        organizationId: orgId,
+        profileId,
+        type,
+        targetId,
+        targetAddress,
+        notes,
+        status: 'PENDING'
+      }
+    });
+    res.status(201).json(claim);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 25. PUT /api/claims/:id: Approve/Reject Claims
+app.put('/api/claims/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status, reviewedBy } = req.body; // status: APPROVED | REJECTED
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const updatedClaim = await prisma.verificationClaim.update({
+      where: { id },
+      data: {
+        status,
+        reviewedById: reviewedBy,
+        reviewedAt: new Date()
+      }
+    });
+
+    // If claim approved, sync profile home district Office if needed
+    if (status === 'VERIFIED') {
+      const claim = await prisma.verificationClaim.findUnique({ where: { id } });
+      if (claim) {
+        // Link to Newark Legislative Ward Representative district optionally
+        const office = await prisma.municipalOffice.findFirst({
+          where: { organizationId: orgId, name: { contains: 'Ward 1' } }
+        });
+        await prisma.profile.update({
+          where: { id: claim.profileId },
+          data: { districtOfficeId: office?.id }
+        });
+      }
+    }
+
+    res.json(updatedClaim);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 26. GET /api/appointments: List municipal appointments calendar
+app.get('/api/appointments', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const list = await prisma.appointment.findMany({
+      where: { organizationId: orgId },
+      include: { office: true },
+      orderBy: { scheduledAt: 'asc' }
+    });
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 27. POST /api/appointments: Book appointment / walk-in log
+app.post('/api/appointments', async (req, res) => {
+  const { requesterName, requesterEmail, department, scheduledAt, purpose, type, officeId } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const appt = await prisma.appointment.create({
+      data: {
+        organizationId: orgId,
+        requesterName,
+        requesterEmail,
+        department,
+        scheduledAt: new Date(scheduledAt),
+        purpose,
+        type: type || 'APPOINTMENT',
+        officeId: officeId || null
+      }
+    });
+    res.status(201).json(appt);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 28. GET /api/case-comments/:type/:id: Fetch in-context comments
+app.get('/api/case-comments/:type/:id', async (req, res) => {
+  const { type, id } = req.params;
+  try {
+    const comments = await prisma.caseComment.findMany({
+      where: {
+        recordType: type,
+        recordId: id
+      },
+      include: { authorOffice: true },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.json(comments);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 29. POST /api/case-comments: File in-context case comment
+app.post('/api/case-comments', async (req, res) => {
+  const { authorId, authorName, authorEmail, authorOfficeId, recordType, recordId, message } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const comment = await prisma.caseComment.create({
+      data: {
+        organizationId: orgId,
+        authorId,
+        authorName,
+        authorEmail,
+        authorOfficeId: authorOfficeId || null,
+        recordType,
+        recordId,
+        message
+      },
+      include: { authorOffice: true }
+    });
+    res.status(201).json(comment);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

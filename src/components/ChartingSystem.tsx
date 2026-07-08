@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   PROPERTIES, 
   PERMITS, 
@@ -45,6 +45,8 @@ interface ChartingSystemProps {
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onOpenChart: (type: 'property' | 'permit' | 'legislative' | 'business', id: string) => void;
+  currentProfile: any;
+  addNotification: (message: string) => void;
 }
 
 export const ChartingSystem: React.FC<ChartingSystemProps> = ({
@@ -52,7 +54,9 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
   activeTabId,
   onSelectTab,
   onCloseTab,
-  onOpenChart
+  onOpenChart,
+  currentProfile,
+  addNotification
 }) => {
   if (tabs.length === 0 || !activeTabId) {
     return (
@@ -1028,13 +1032,146 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
         })}
       </div>
 
-      {/* Chart Content Area */}
-      <div className="chart-content">
-        {activeTab?.type === 'property' && renderPropertyChart(activeTab.id)}
-        {activeTab?.type === 'permit' && renderPermitChart(activeTab.id)}
-        {activeTab?.type === 'legislative' && renderLegislativeChart(activeTab.id)}
-        {activeTab?.type === 'business' && renderBusinessChart(activeTab.id)}
+      {/* Chart Content Area with Side-by-Side message thread */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div className="chart-content" style={{ flex: 1, overflowY: 'auto' }}>
+          {activeTab?.type === 'property' && renderPropertyChart(activeTab.id)}
+          {activeTab?.type === 'permit' && renderPermitChart(activeTab.id)}
+          {activeTab?.type === 'legislative' && renderLegislativeChart(activeTab.id)}
+          {activeTab?.type === 'business' && renderBusinessChart(activeTab.id)}
+        </div>
+        
+        {activeTab && (
+          <CaseNotesSidebar 
+            recordType={activeTab.type}
+            recordId={activeTab.id}
+            currentProfile={currentProfile}
+            addNotification={addNotification}
+          />
+        )}
       </div>
+    </div>
+  );
+};
+
+const CaseNotesSidebar: React.FC<{
+  recordType: string;
+  recordId: string;
+  currentProfile: any;
+  addNotification: (message: string) => void;
+}> = ({ recordType, recordId, currentProfile, addNotification }) => {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const orgId = currentProfile?.organizationId || '';
+  
+  const [comments, setComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const fetchComments = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_URL}/api/case-comments/${recordType}/${recordId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setComments(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [recordType, recordId]);
+
+  const handleSendComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim() || !currentProfile) return;
+    try {
+      const res = await fetch(`${API_URL}/api/case-comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-organization-id': orgId
+        },
+        body: JSON.stringify({
+          authorId: currentProfile.id,
+          authorName: currentProfile.email.split('@')[0],
+          authorEmail: currentProfile.email,
+          authorOfficeId: currentProfile.districtOfficeId || null,
+          recordType,
+          recordId,
+          message: newComment
+        })
+      });
+      if (res.ok) {
+        setNewComment('');
+        fetchComments();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <div style={{ width: '300px', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: '#0b0c10', height: '100%' }}>
+      <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)' }}>
+        <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary-color)' }}>
+          Record Discussion Thread
+        </h4>
+        <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+          In-context staff notes attached to this {recordType}
+        </span>
+      </div>
+
+      {/* Message List */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {loading ? (
+          <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center' }}>Syncing thread...</div>
+        ) : comments.length === 0 ? (
+          <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', marginTop: '20px' }}>
+            No comments logged. Type a note to start.
+          </div>
+        ) : (
+          comments.map(c => (
+            <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: '3px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#fff' }}>
+                  {c.authorName.replace('.', ' ')}
+                </span>
+                {c.authorOffice?.name && (
+                  <span style={{ fontSize: '8px', padding: '1px 4px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '3px', color: '#60a5fa' }}>
+                    {c.authorOffice.name.split(' ')[0]}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '4px 0 0 0', lineHeight: '1.4' }}>
+                {c.message}
+              </p>
+              <span style={{ fontSize: '8px', color: 'var(--text-muted)', alignSelf: 'flex-end', marginTop: '2px' }}>
+                {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Message input */}
+      <form onSubmit={handleSendComment} style={{ padding: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)' }}>
+        <input 
+          type="text" 
+          className="ai-input" 
+          value={newComment} 
+          onChange={e => setNewComment(e.target.value)} 
+          placeholder="Type note..." 
+          style={{ flex: 1, fontSize: '11px', height: '28px', padding: '0 8px' }}
+        />
+        <button type="submit" className="ai-btn-send" style={{ height: '28px', padding: '0 10px', fontSize: '11px' }}>
+          Post
+        </button>
+      </form>
     </div>
   );
 };

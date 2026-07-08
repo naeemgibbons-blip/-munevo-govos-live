@@ -22,6 +22,7 @@ import {
   DollarSign, 
   Building,
   User,
+  UserPlus,
   Plus,
   Gavel,
   Briefcase,
@@ -72,6 +73,24 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
     netting: false,
     clearance: false
   });
+
+  // Verification Claim form states
+  const [claimAddress, setClaimAddress] = useState('12 Ferry St, Newark, NJ');
+  const [claimType, setClaimType] = useState('RESIDENT_PROPERTY');
+  const [claimNotes, setClaimNotes] = useState('');
+  const [claimStatusText, setClaimStatusText] = useState('');
+
+  // Appointment Booking states
+  const [apptDept, setApptDept] = useState("Mayor's Office");
+  const [apptDate, setApptDate] = useState('2026-07-15T10:00');
+  const [apptPurpose, setApptPurpose] = useState('');
+
+  // Staff Walk-In logging states
+  const [walkinName, setWalkinName] = useState('');
+  const [walkinEmail, setWalkinEmail] = useState('');
+  const [walkinPurpose, setWalkinPurpose] = useState('');
+  const [walkinDept, setWalkinDept] = useState("Mayor's Office");
+  const [escalateTo311, setEscalateTo311] = useState(false);
 
   // Open Records State for Clerk landing
   const [openRecords, setOpenRecords] = useState<any[]>([]);
@@ -158,6 +177,115 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
     addNotification(`Inspection ${activeInspectionId} logged as ${status}`);
     setInspectorNotes('');
     setActiveInspectionId(null);
+  };
+
+  const handleCreateClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentProfile?.id) return;
+    try {
+      const res = await fetch(`${API_URL}/api/claims`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-organization-id': orgId
+        },
+        body: JSON.stringify({
+          profileId: currentProfile.id,
+          type: claimType,
+          targetId: 'prop_02', // Default link to Ferry St property
+          targetAddress: claimAddress,
+          notes: claimNotes
+        })
+      });
+      if (res.ok) {
+        addNotification('Verification claim submitted. Awaiting clerk manual audit.');
+        setClaimNotes('');
+        setClaimStatusText('PENDING VERIFICATION');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateAppt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_URL}/api/appointments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-organization-id': orgId
+        },
+        body: JSON.stringify({
+          requesterName: getUserDisplayName(),
+          requesterEmail: currentProfile?.email || 'resident@munevo.gov',
+          department: apptDept,
+          scheduledAt: apptDate,
+          purpose: apptPurpose,
+          type: 'APPOINTMENT'
+        })
+      });
+      if (res.ok) {
+        addNotification(`Meeting with ${apptDept} scheduled successfully!`);
+        setApptPurpose('');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateWalkin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walkinName.trim()) return;
+    try {
+      const resAppt = await fetch(`${API_URL}/api/appointments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-organization-id': orgId
+        },
+        body: JSON.stringify({
+          requesterName: walkinName,
+          requesterEmail: walkinEmail || 'walkin@constituent.local',
+          department: walkinDept,
+          scheduledAt: new Date().toISOString(),
+          purpose: walkinPurpose,
+          type: 'WALK_IN'
+        })
+      });
+
+      if (escalateTo311 && resAppt.ok) {
+        const res311 = await fetch(`${API_URL}/api/tracker`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-organization-id': orgId,
+            'x-user-id': currentProfile?.id || '',
+            'x-user-email': currentProfile?.email || ''
+          },
+          body: JSON.stringify({
+            module: '311',
+            title: `Constituent Walk-in: ${walkinPurpose}`,
+            status: 'Open',
+            priority: 'Medium',
+            assignedTo: 'Public Works Operations',
+            address: '42 Ferry St, Newark, NJ'
+          })
+        });
+        if (res311.ok) {
+          const trackerItem = await res311.json();
+          setTrackerItems(prev => [trackerItem, ...prev]);
+        }
+      }
+
+      addNotification(`Constituent walk-in logged: ${walkinName}`);
+      setWalkinName('');
+      setWalkinEmail('');
+      setWalkinPurpose('');
+      setEscalateTo311(false);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Helper to determine staff user's name
@@ -410,41 +538,91 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
 
           {/* Resident Form */}
           {currentRole.id === 'resident' && (
-            <div className="glass-card">
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="card-title">
-                  <Plus size={16} />
-                  <span>Submit a 311 Service Request</span>
+            <>
+              <div className="glass-card">
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="card-title">
+                    <Plus size={16} />
+                    <span>Submit a 311 Service Request</span>
+                  </div>
                 </div>
+                <form onSubmit={handleSubmit311} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location Address</label>
+                    <select className="select-filter" value={newRequestAddress} onChange={e => setNewRequestAddress(e.target.value)}>
+                      {Object.values(PROPERTIES).map(p => (
+                        <option key={p.id} value={p.address}>{p.address}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Request Type</label>
+                    <select className="select-filter" value={newRequestType} onChange={e => setNewRequestType(e.target.value)}>
+                      <option value="Trash & Debris">Trash & Debris</option>
+                      <option value="Water Pressure / Leak">Water Pressure & Leak</option>
+                      <option value="Illegal Parking">Illegal Parking</option>
+                      <option value="Structural Hazard">Structural Hazard</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident Details</label>
+                    <textarea className="ai-input" style={{ minHeight: '70px', width: '100%' }} placeholder="Describe the issue you noticed..." value={newRequestDesc} onChange={e => setNewRequestDesc(e.target.value)} required />
+                  </div>
+                  <button type="submit" className="ai-btn-send" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Send size={12} />
+                    <span>Submit 311 Ticket</span>
+                  </button>
+                </form>
               </div>
-              <form onSubmit={handleSubmit311} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location Address</label>
-                  <select className="select-filter" value={newRequestAddress} onChange={e => setNewRequestAddress(e.target.value)}>
-                    {Object.values(PROPERTIES).map(p => (
-                      <option key={p.id} value={p.address}>{p.address}</option>
-                    ))}
-                  </select>
+
+              {/* Self-Service Property Claim */}
+              <div className="glass-card" style={{ marginTop: '20px' }}>
+                <div className="card-header">
+                  <div className="card-title">
+                    <Building size={16} />
+                    <span>Claim a Property / Project (Self-Service)</span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Request Type</label>
-                  <select className="select-filter" value={newRequestType} onChange={e => setNewRequestType(e.target.value)}>
-                    <option value="Trash & Debris">Trash & Debris</option>
-                    <option value="Water Pressure / Leak">Water Pressure & Leak</option>
-                    <option value="Illegal Parking">Illegal Parking</option>
-                    <option value="Structural Hazard">Structural Hazard</option>
-                  </select>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident Details</label>
-                  <textarea className="ai-input" style={{ minHeight: '70px', width: '100%' }} placeholder="Describe the issue you noticed..." value={newRequestDesc} onChange={e => setNewRequestDesc(e.target.value)} required />
-                </div>
-                <button type="submit" className="ai-btn-send" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Send size={12} />
-                  <span>Submit 311 Ticket</span>
-                </button>
-              </form>
-            </div>
+                <form onSubmit={handleCreateClaim} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Claim Type</label>
+                    <select className="select-filter" value={claimType} onChange={e => setClaimType(e.target.value)}>
+                      <option value="RESIDENT_PROPERTY">Resident Property Owner / Tenant</option>
+                      <option value="CONTRACTOR_PROJECT">Contractor Project Association</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Address / Location</label>
+                    <select className="select-filter" value={claimAddress} onChange={e => setClaimAddress(e.target.value)}>
+                      {Object.values(PROPERTIES).map(p => (
+                        <option key={p.id} value={p.address}>{p.address}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Verification Notes / Proof</label>
+                    <textarea 
+                      className="ai-input" 
+                      style={{ minHeight: '60px', width: '100%' }} 
+                      placeholder="Enter utility account details or lease verification info..." 
+                      value={claimNotes} 
+                      onChange={e => setClaimNotes(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <button type="submit" className="ai-btn-send">
+                      Submit Association Claim
+                    </button>
+                    {claimStatusText && (
+                      <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--warning-text)' }}>
+                        {claimStatusText}
+                      </span>
+                    )}
+                  </div>
+                </form>
+              </div>
+            </>
           )}
 
         </div>
@@ -518,33 +696,78 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
 
           {/* Clerk Records Requests queue */}
           {currentRole.id === 'clerk' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">
-                  <FileText size={14} style={{ color: 'var(--warning-text)' }} />
-                  <span>Pending FOIA / Record Requests</span>
+            <>
+              <div className="glass-card">
+                <div className="card-header">
+                  <div className="card-title">
+                    <FileText size={14} style={{ color: 'var(--warning-text)' }} />
+                    <span>Pending FOIA / Record Requests</span>
+                  </div>
+                </div>
+                <div className="list-queue">
+                  {pendingRecords.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
+                      No record requests require review.
+                    </div>
+                  ) : (
+                    pendingRecords.map(req => (
+                      <div key={req.id} className="queue-item" onClick={() => onOpenChart('property', 'prop_01')}>
+                        <div className="queue-details">
+                          <span className="queue-title">{req.requesterName}</span>
+                          <span className="queue-sub" style={{ display: 'block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {req.description}
+                          </span>
+                        </div>
+                        <span className="badge-status badge-warn">{req.status}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-              <div className="list-queue">
-                {pendingRecords.length === 0 ? (
-                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
-                    No record requests require review.
+
+              {/* Clerk Walk-In Log Form */}
+              <div className="glass-card" style={{ marginTop: '20px' }}>
+                <div className="card-header">
+                  <div className="card-title">
+                    <UserPlus size={14} style={{ color: 'var(--accent-color)' }} />
+                    <span>Constituent Walk-In Intake Registry</span>
                   </div>
-                ) : (
-                  pendingRecords.map(req => (
-                    <div key={req.id} className="queue-item" onClick={() => onOpenChart('property', 'prop_01')}>
-                      <div className="queue-details">
-                        <span className="queue-title">{req.requesterName}</span>
-                        <span className="queue-sub" style={{ display: 'block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {req.description}
-                        </span>
-                      </div>
-                      <span className="badge-status badge-warn">{req.status}</span>
+                </div>
+                <form onSubmit={handleCreateWalkin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Constituent Name</label>
+                      <input type="text" className="ai-input" style={{ width: '100%' }} value={walkinName} onChange={e => setWalkinName(e.target.value)} placeholder="e.g. John Miller" required />
                     </div>
-                  ))
-                )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Constituent Email</label>
+                      <input type="email" className="ai-input" style={{ width: '100%' }} value={walkinEmail} onChange={e => setWalkinEmail(e.target.value)} placeholder="e.g. john@mail.com" />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Destination Office</label>
+                    <select className="select-filter" value={walkinDept} onChange={e => setWalkinDept(e.target.value)}>
+                      <option value="Mayor's Office">Mayor's Office</option>
+                      <option value="Ward 1 Council Office">Ward 1 Council Office</option>
+                      <option value="Ward 2 Council Office">Ward 2 Council Office</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Visit Description</label>
+                    <textarea className="ai-input" style={{ minHeight: '60px', width: '100%' }} placeholder="What does the constituent need assistance with?" value={walkinPurpose} onChange={e => setWalkinPurpose(e.target.value)} required />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem' }}>
+                      <input type="checkbox" checked={escalateTo311} onChange={e => setEscalateTo311(e.target.checked)} />
+                      Escalate & dispatch 311 operations ticket
+                    </label>
+                    <button type="submit" className="ai-btn-send">
+                      Log Intake Visit
+                    </button>
+                  </div>
+                </form>
               </div>
-            </div>
+            </>
           )}
 
           {/* Finance approvals list */}
@@ -595,20 +818,66 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
 
           {/* Resident utility bills */}
           {currentRole.id === 'resident' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">My Utilities & Tax Statements</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Water Service Account</span>
-                    <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--warning-text)' }}>$84.50 Due</span>
+            <>
+              <div className="glass-card">
+                <div className="card-header">
+                  <div className="card-title">My Utilities & Tax Statements</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Water Service Account</span>
+                      <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--warning-text)' }}>$84.50 Due</span>
+                    </div>
+                    <button className="ai-btn-send" style={{ height: '32px' }} onClick={() => addNotification('Utility payment processed!')}>Pay Bill</button>
                   </div>
-                  <button className="ai-btn-send" style={{ height: '32px' }} onClick={() => addNotification('Utility payment processed!')}>Pay Bill</button>
                 </div>
               </div>
-            </div>
+
+              {/* Book Appointment Card */}
+              <div className="glass-card" style={{ marginTop: '20px' }}>
+                <div className="card-header">
+                  <div className="card-title">
+                    <Calendar size={14} style={{ color: 'var(--primary-color)' }} />
+                    <span>Book Department Appointment</span>
+                  </div>
+                </div>
+                <form onSubmit={handleCreateAppt} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Department / Office</label>
+                    <select className="select-filter" value={apptDept} onChange={e => setApptDept(e.target.value)}>
+                      <option value="Mayor's Office">Mayor's Office</option>
+                      <option value="Ward 1 Council Office">Ward 1 Council Office</option>
+                      <option value="Zoning Board Office">Zoning Board Office</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Requested Date & Time</label>
+                    <input 
+                      type="datetime-local" 
+                      className="select-filter" 
+                      value={apptDate} 
+                      onChange={e => setApptDate(e.target.value)} 
+                      style={{ color: '#fff', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px 10px', borderRadius: '6px' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Meeting Purpose</label>
+                    <textarea 
+                      className="ai-input" 
+                      style={{ minHeight: '60px', width: '100%' }} 
+                      placeholder="Enter meeting agenda..." 
+                      value={apptPurpose} 
+                      onChange={e => setApptPurpose(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                  <button type="submit" className="ai-btn-send">
+                    Schedule Meeting
+                  </button>
+                </form>
+              </div>
+            </>
           )}
 
         </div>

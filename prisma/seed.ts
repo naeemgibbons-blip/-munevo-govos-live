@@ -10,6 +10,9 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log('Clearing database tables...');
+  await prisma.caseComment.deleteMany();
+  await prisma.appointment.deleteMany();
+  await prisma.verificationClaim.deleteMany();
   await prisma.trackerItem.deleteMany();
   await prisma.inspection.deleteMany();
   await prisma.permit.deleteMany();
@@ -20,6 +23,7 @@ async function main() {
   await prisma.permission.deleteMany();
   await prisma.profile.deleteMany();
   await prisma.customRole.deleteMany();
+  await prisma.municipalOffice.deleteMany();
   await prisma.organization.deleteMany();
 
   console.log('Seeding Organizations...');
@@ -37,8 +41,34 @@ async function main() {
     }
   });
 
+  console.log('Seeding Newark Municipal Offices & Branches...');
+  const officeMayor = await prisma.municipalOffice.create({
+    data: {
+      organizationId: newark.id,
+      name: "Mayor's Office",
+      branch: "EXECUTIVE"
+    }
+  });
+
+  const officeCouncil1 = await prisma.municipalOffice.create({
+    data: {
+      organizationId: newark.id,
+      name: "Ward 1 Council Office",
+      branch: "LEGISLATIVE",
+      districtNumber: "Ward 1"
+    }
+  });
+
+  const officeCouncil2 = await prisma.municipalOffice.create({
+    data: {
+      organizationId: newark.id,
+      name: "Ward 2 Council Office",
+      branch: "LEGISLATIVE",
+      districtNumber: "Ward 2"
+    }
+  });
+
   console.log('Seeding Newark Custom Roles & Permissions...');
-  // Newark Custom Role: Code Enforcement Officer
   const roleCodeOfficer = await prisma.customRole.create({
     data: {
       organizationId: newark.id,
@@ -57,7 +87,6 @@ async function main() {
     ]
   });
 
-  // Newark Custom Role: Building Inspector
   const roleInspector = await prisma.customRole.create({
     data: {
       organizationId: newark.id,
@@ -77,7 +106,6 @@ async function main() {
   });
 
   console.log('Seeding Profiles (User Sessions)...');
-  // 1. Global Admin Profile
   await prisma.profile.create({
     data: {
       id: 'simulated-user-global_admin',
@@ -89,7 +117,6 @@ async function main() {
     }
   });
 
-  // 2. Newark Org Admin Profile (Mayor/City Manager)
   await prisma.profile.create({
     data: {
       id: 'simulated-user-mayor',
@@ -97,11 +124,12 @@ async function main() {
       isGlobalAdmin: false,
       isOrgAdmin: true,
       organizationId: newark.id,
-      roleId: null
+      roleId: null,
+      badgeId: 'BADGE-EX-001',
+      districtOfficeId: officeMayor.id
     }
   });
 
-  // 3. Newark Staff Inspector Profile
   await prisma.profile.create({
     data: {
       id: 'simulated-user-inspector',
@@ -109,19 +137,21 @@ async function main() {
       isGlobalAdmin: false,
       isOrgAdmin: false,
       organizationId: newark.id,
-      roleId: roleInspector.id
+      roleId: roleInspector.id,
+      badgeId: 'BADGE-IN-002',
+      districtOfficeId: officeCouncil1.id
     }
   });
 
-  // 4. Newark Resident Profile
-  await prisma.profile.create({
+  const residentProfile = await prisma.profile.create({
     data: {
       id: 'simulated-user-resident',
       email: 'resident@munevo.gov',
       isGlobalAdmin: false,
       isOrgAdmin: false,
       organizationId: newark.id,
-      roleId: null
+      roleId: null,
+      districtOfficeId: officeCouncil1.id // Associated with Ward 1 representative district
     }
   });
 
@@ -225,7 +255,9 @@ async function main() {
         slaDays: item.slaDays,
         slaProgress: item.slaProgress,
         reportedDate: new Date(item.reportedDate),
-        propertyId: propertyId
+        propertyId: propertyId,
+        originOfficeId: officeCouncil1.id,
+        targetOfficeId: officeMayor.id
       }
     });
   }
@@ -308,11 +340,6 @@ async function main() {
   });
 
   console.log('Seeding Newark Staff directory (Employees & Certifications)...');
-  await prisma.timesheet.deleteMany();
-  await prisma.certification.deleteMany();
-  await prisma.employee.deleteMany();
-  await prisma.auditLog.deleteMany();
-
   const empElena = await prisma.employee.create({
     data: {
       organizationId: newark.id,
@@ -320,7 +347,8 @@ async function main() {
       lastName: 'Rostova',
       email: 'elena.rostova@newark.gov',
       department: 'Code Enforcement',
-      hireDate: new Date('2023-03-15')
+      hireDate: new Date('2023-03-15'),
+      officeId: officeMayor.id
     }
   });
 
@@ -331,7 +359,8 @@ async function main() {
       lastName: 'Miller',
       email: 'marcus.miller@newark.gov',
       department: 'Public Works',
-      hireDate: new Date('2022-06-10')
+      hireDate: new Date('2022-06-10'),
+      officeId: officeCouncil1.id
     }
   });
 
@@ -342,7 +371,8 @@ async function main() {
       lastName: 'Carter',
       email: 'bob.carter@newark.gov',
       department: 'Legal & Compliance',
-      hireDate: new Date('2024-01-10')
+      hireDate: new Date('2024-01-10'),
+      officeId: officeCouncil2.id
     }
   });
 
@@ -360,7 +390,7 @@ async function main() {
         name: 'Zoning Board Review Certification',
         credentialId: 'CERT-ZON-2024-11',
         issuedDate: new Date('2024-11-20'),
-        expiresAt: new Date('2026-08-30') // Soon expiring!
+        expiresAt: new Date('2026-08-30')
       },
       {
         employeeId: empMarcus.id,
@@ -415,7 +445,6 @@ async function main() {
   });
 
   console.log('Seeding Open Records requests...');
-  await prisma.openRecordsRequest.deleteMany();
   await prisma.openRecordsRequest.createMany({
     data: [
       {
@@ -435,6 +464,82 @@ async function main() {
         dateRange: 'Jan 2026 - Jun 2026',
         status: 'Under Review',
         assignedTo: 'Water Dept Lead'
+      }
+    ]
+  });
+
+  console.log('Seeding Verification Claims...');
+  await prisma.verificationClaim.createMany({
+    data: [
+      {
+        organizationId: newark.id,
+        profileId: residentProfile.id,
+        type: 'RESIDENT_PROPERTY',
+        targetId: 'prop_02',
+        targetAddress: '12 Ferry St, Newark, NJ',
+        notes: 'Signed lease agreement uploaded, matching address on utility logs.',
+        status: 'PENDING'
+      },
+      {
+        organizationId: newark.id,
+        profileId: residentProfile.id,
+        type: 'RESIDENT_PROPERTY',
+        targetId: 'prop_01',
+        targetAddress: '744 Broad St, Newark, NJ',
+        notes: 'Owner occupancy declaration verified.',
+        status: 'VERIFIED'
+      }
+    ]
+  });
+
+  console.log('Seeding Appointments & Walk-Ins...');
+  await prisma.appointment.createMany({
+    data: [
+      {
+        organizationId: newark.id,
+        requesterName: 'Alice Vance',
+        requesterEmail: 'alice.vance@gmail.com',
+        department: "Mayor's Office",
+        scheduledAt: new Date('2026-07-15T10:00:00Z'),
+        purpose: 'Discuss downtown zone tax foreclosure incentives.',
+        type: 'APPOINTMENT',
+        officeId: officeMayor.id
+      },
+      {
+        organizationId: newark.id,
+        requesterName: 'Terrance Higgins',
+        requesterEmail: 'terrance@gmail.com',
+        department: 'Ward 1 Council Office',
+        scheduledAt: new Date(),
+        purpose: 'Walk-In constituent complaining about sidewalk overgrowth debris.',
+        type: 'WALK_IN',
+        officeId: officeCouncil1.id
+      }
+    ]
+  });
+
+  console.log('Seeding Case Comments...');
+  await prisma.caseComment.createMany({
+    data: [
+      {
+        organizationId: newark.id,
+        authorId: 'simulated-user-inspector',
+        authorName: 'Elena Rostova',
+        authorEmail: 'elena.rostova@newark.gov',
+        authorOfficeId: officeMayor.id,
+        recordType: 'Permit',
+        recordId: 'perm_01',
+        message: 'Completed initial master plan zoning alignment audit.'
+      },
+      {
+        organizationId: newark.id,
+        authorId: 'simulated-user-inspector',
+        authorName: 'Marcus Miller',
+        authorEmail: 'marcus.miller@newark.gov',
+        authorOfficeId: officeCouncil1.id,
+        recordType: 'TrackerItem',
+        recordId: 'TRK-9831',
+        message: 'Water booster main replacement crew dispatched for side-street flush.'
       }
     ]
   });

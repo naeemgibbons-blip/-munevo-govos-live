@@ -69,7 +69,32 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
   ]);
 
   // Handle Badge Tap Login (Epic style session recovery simulation)
-  const handleBadgeTap = (roleName: 'mayor' | 'inspector' | 'resident') => {
+  const handleBadgeTap = async (roleName: 'mayor' | 'inspector' | 'resident') => {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    let badgeId = 'BADGE-EX-001'; // Matches mayor badgeId in seed.ts
+    if (roleName === 'inspector') {
+      badgeId = 'BADGE-IN-002'; // Matches inspector badgeId in seed.ts
+    } else if (roleName === 'resident') {
+      badgeId = 'BADGE-RES-NONE';
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/badge-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ badgeId })
+      });
+
+      if (res.ok) {
+        const profile = await res.json();
+        addNotification(`NFC Tap Verification: Verified credentials for ${profile.email}`);
+      } else {
+        addNotification('NFC Tap Status: Falling back to local offline profile sync.');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
     let targetRole = USER_ROLES.mayor;
     let welcomeMsg = '';
     let restoredTabsCount = 0;
@@ -95,7 +120,7 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
     // Log event in audit trail
     const time = new Date().toTimeString().split(' ')[0];
     setAuditLogs(prev => [
-      { time, event: `Badge Tap Login: ${targetRole.name} authenticated. Resumed ${restoredTabsCount} workspace tabs.`, actor: 'Munevo ID HID Global' },
+      { time, event: `Badge Tap Login: ${targetRole.name} authenticated via NFC credentials.`, actor: 'Munevo ID HID Global' },
       ...prev
     ]);
 

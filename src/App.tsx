@@ -647,6 +647,8 @@ function App() {
                 onSelectTab={setActiveChartTabId}
                 onCloseTab={handleCloseTab}
                 onOpenChart={handleOpenChart}
+                currentProfile={currentProfile}
+                addNotification={addNotification}
               />
             )}
           </div>
