@@ -45,6 +45,9 @@ interface CommandCenterProps {
   onUpdatePermit: (id: string, updated: Partial<PermitRecord>) => void;
   onUpdateInspection: (id: string, updated: Partial<InspectionRecord>) => void;
   canEdit?: boolean;
+  properties: any[];
+  permits: any[];
+  inspections: any[];
 }
 
 export const CommandCenter: React.FC<CommandCenterProps> = ({
@@ -56,7 +59,10 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   addNotification,
   onUpdatePermit,
   onUpdateInspection,
-  canEdit = true
+  canEdit = true,
+  properties,
+  permits,
+  inspections
 }) => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   const orgId = currentProfile?.organizationId || '';
@@ -107,40 +113,40 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   }, [orgId, currentRole.id]);
 
   // Handle submitting 311 request
-  const handleSubmit311 = (e: React.FormEvent) => {
+  const handleSubmit311 = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRequestDesc.trim()) return;
 
-    const newId = `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newItem: TrackerItem = {
-      id: newId,
-      module: '311',
-      title: `${newRequestType} reported.`,
-      status: 'Open',
-      priority: newRequestType === 'Structural Hazard' ? 'High' : 'Medium',
-      assignedTo: 'Public Works Operations',
-      slaDays: newRequestType === 'Structural Hazard' ? 1 : 4,
-      slaProgress: 0,
-      reportedDate: new Date().toISOString().split('T')[0],
-      address: newRequestAddress,
-      comments: [
-        { user: 'Resident (MyMunevo)', text: newRequestDesc, date: 'Just now' }
-      ],
-      history: [
-        { action: 'Ticket Created via MyMunevo', user: 'Resident', date: 'Just now' },
-        { action: 'Assigned to Public Works Operations', user: 'Auto-Routing AI', date: 'Just now' }
-      ],
-      attachments: [],
-      relatedRecords: [],
-      customFields: {
-        'SLA Category': 'Resident 311 Intake',
-        'Incident Type': newRequestType
-      }
-    };
+    try {
+      const res = await fetch(`${API_URL}/api/tracker`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-organization-id': orgId
+        },
+        body: JSON.stringify({
+          module: '311',
+          title: `${newRequestType}: ${newRequestDesc}`,
+          status: 'Open',
+          priority: newRequestType === 'Structural Hazard' ? 'High' : 'Medium',
+          assignedTo: 'Public Works Operations',
+          slaDays: newRequestType === 'Structural Hazard' ? 2 : 7,
+          address: newRequestAddress
+        })
+      });
 
-    setTrackerItems(prev => [newItem, ...prev]);
-    addNotification(`Successfully submitted 311 request ${newId}!`);
-    setNewRequestDesc('');
+      if (res.ok) {
+        const data = await res.json();
+        setTrackerItems(prev => [data, ...prev]);
+        addNotification(`Live database record registered: 311 Case ${data.id}!`);
+        setNewRequestDesc('');
+      } else {
+        addNotification('Database Error: Failed to register 311 ticket.');
+      }
+    } catch (err) {
+      console.error(err);
+      addNotification('API connection error.');
+    }
   };
 
   // Handle Inspector submitting report
@@ -308,13 +314,11 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
     );
   });
 
-  const myScheduledInspections = Object.values(INSPECTIONS).filter(insp => {
-    const isToday = insp.scheduledDate === '2026-07-07';
-    const isMe = currentRole.id === 'inspector' || insp.inspectorName.toLowerCase().includes(getUserDisplayName().toLowerCase());
-    return isToday && isMe;
+  const myScheduledInspections = inspections.filter(insp => {
+    return currentRole.id === 'inspector' || insp.inspectorName.toLowerCase().includes(getUserDisplayName().toLowerCase());
   });
 
-  const pendingPermits = Object.values(PERMITS).filter(p => p.status === 'Issued' || p.status === 'In Review');
+  const pendingPermits = permits.filter(p => p.status === 'Issued' || p.status === 'In Review');
 
   const pendingRecords = openRecords.filter(r => r.status === 'Received' || r.status === 'Under Review');
 

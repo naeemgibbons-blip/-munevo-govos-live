@@ -288,6 +288,34 @@ app.get('/api/organizations', async (req, res) => {
   }
 });
 
+// 5.3. GET /api/permits: List permits
+app.get('/api/permits', async (req, res) => {
+  const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    const list = await prisma.permit.findMany({
+      where: orgId ? { organizationId: orgId } : {},
+      include: { property: true }
+    });
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5.4. GET /api/inspections: List inspections
+app.get('/api/inspections', async (req, res) => {
+  const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    const list = await prisma.inspection.findMany({
+      where: orgId ? { organizationId: orgId } : {},
+      include: { property: true }
+    });
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 6. POST /api/organizations: Create a new organization
 app.post('/api/organizations', async (req, res) => {
   const { name, slug } = req.body;

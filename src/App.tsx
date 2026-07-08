@@ -56,6 +56,8 @@ function App() {
   // Operations Data States
   const [properties, setProperties] = useState<Record<string, any>>(PROPERTIES);
   const [trackerItems, setTrackerItemsRaw] = useState<TrackerItem[]>(TRACKER_ITEMS);
+  const [permits, setPermits] = useState<any[]>([]);
+  const [inspections, setInspections] = useState<any[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // Fetch Organizations on boot
@@ -136,34 +138,30 @@ function App() {
     fetch(`${API_URL}/api/properties`, {
       headers: { 'x-organization-id': currentOrgId }
     })
-    .then(res => {
-      if (!res.ok) throw new Error('API server returned error status');
-      return res.json();
-    })
-    .then(data => {
-      setProperties(data);
-      setConnectionError(null);
-    })
-    .catch(err => {
-      console.error('Failed to load isolated property records:', err);
-      setConnectionError('Munevo DB API Server is currently offline. Please run "npm run dev" or check port 3001.');
-    });
+    .then(res => res.json())
+    .then(data => setProperties(data))
+    .catch(err => console.error(err));
 
     fetch(`${API_URL}/api/tracker`, {
       headers: { 'x-organization-id': currentOrgId }
     })
-    .then(res => {
-      if (!res.ok) throw new Error('API server returned error status');
-      return res.json();
+    .then(res => res.json())
+    .then(data => setTrackerItemsRaw(data))
+    .catch(err => console.error(err));
+
+    fetch(`${API_URL}/api/permits`, {
+      headers: { 'x-organization-id': currentOrgId }
     })
-    .then(data => {
-      setTrackerItemsRaw(data);
-      setConnectionError(null);
+    .then(res => res.json())
+    .then(data => setPermits(data))
+    .catch(err => console.error(err));
+
+    fetch(`${API_URL}/api/inspections`, {
+      headers: { 'x-organization-id': currentOrgId }
     })
-    .catch(err => {
-      console.error('Failed to load isolated tracker records:', err);
-      setConnectionError('Munevo DB API Server is currently offline. Please run "npm run dev" or check port 3001.');
-    });
+    .then(res => res.json())
+    .then(data => setInspections(data))
+    .catch(err => console.error(err));
   }, [currentOrgId]);
 
   // Evaluate module write permission dynamically
@@ -606,6 +604,9 @@ function App() {
                     onUpdatePermit={handleUpdatePermit}
                     onUpdateInspection={handleUpdateInspection}
                     canEdit={canEditModule('command-center')}
+                    properties={Object.values(properties)}
+                    permits={permits}
+                    inspections={inspections}
                   />
                 )}
 
