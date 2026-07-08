@@ -12,6 +12,7 @@ import { OrgAdminConsole } from './components/OrgAdminConsole';
 import { OpenRecords } from './components/OpenRecords';
 import { EmployeeRoster } from './components/EmployeeRoster';
 import { AuditTrail } from './components/AuditTrail';
+import { MobileFieldView } from './components/MobileFieldView';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -25,7 +26,7 @@ import {
   InspectionRecord,
   LegislativeItem
 } from './mockData';
-import { Bell, Search, AlertCircle } from 'lucide-react';
+import { Bell, Search, AlertCircle, Smartphone } from 'lucide-react';
 
 interface ToastMessage {
   id: number;
@@ -46,7 +47,7 @@ function App() {
 
   // Layout Modules
   const [activeModule, setActiveModule] = useState('command-center');
-  const [viewMode, setViewMode] = useState<'module' | 'chart'>('module');
+  const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field'>('module');
 
   // Chart Workspace Tabs State
   const [chartTabs, setChartTabs] = useState<ChartTabItem[]>([]);
@@ -255,7 +256,31 @@ function App() {
   const [legislativeItems, setLegislativeItems] = useState<LegislativeItem[]>(LEGISLATIVE_ITEMS);
   const [activePropertyId, setActivePropertyId] = useState<string | null>('prop_01');
   const [searchVal, setSearchVal] = useState('');
+  const [searchResults, setSearchResults] = useState<any>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  useEffect(() => {
+    if (searchVal.length < 2) {
+      setSearchResults(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/search?q=${encodeURIComponent(searchVal)}`, {
+          headers: { 'x-organization-id': currentOrgId }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchVal, currentOrgId]);
 
   const addNotification = (text: string) => {
     const id = Date.now() + Math.random();
@@ -398,6 +423,16 @@ function App() {
 
   const activeChartTab = chartTabs.find(t => t.id === activeChartTabId) || null;
 
+  if (viewMode === 'mobile-field') {
+    return (
+      <MobileFieldView 
+        currentProfile={currentProfile}
+        addNotification={addNotification}
+        onExit={() => setViewMode('module')}
+      />
+    );
+  }
+
   return (
     <div className="app-container">
       <Sidebar 
@@ -414,15 +449,67 @@ function App() {
 
       <main className="main-panel">
         <header className="dashboard-header">
-          <form onSubmit={handleGlobalSearch} className="header-search">
+          <div className="header-search" style={{ position: 'relative' }}>
             <input 
               type="text" 
               placeholder="Search properties, permits, cases (e.g. 'Ferry St', 'PM-2026')..." 
               value={searchVal}
               onChange={(e) => setSearchVal(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
             />
             <Search className="header-search-icon" size={14} />
-          </form>
+
+            {searchFocused && searchResults && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: '#11131c',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                marginTop: '6px',
+                maxHeight: '320px',
+                overflowY: 'auto',
+                zIndex: 1000,
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+              }}>
+                {Object.keys(searchResults).map(category => {
+                  const items = searchResults[category];
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={category} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--primary-color)', padding: '6px 12px', background: 'rgba(255,255,255,0.01)', textTransform: 'uppercase' }}>
+                        {category}
+                      </div>
+                      {items.map((item: any) => (
+                        <div 
+                          key={item.id} 
+                          onClick={() => {
+                            handleOpenChart(item.type, item.id);
+                            setSearchVal('');
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            fontSize: '11.5px',
+                            color: '#fff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px'
+                          }}
+                        >
+                          <span style={{ fontWeight: 600 }}>{item.label}</span>
+                          <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)' }}>{item.sub}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="header-actions">
             {chartTabs.length > 0 && (
@@ -457,6 +544,26 @@ function App() {
                 </button>
               </div>
             )}
+            {/* Mobile Field View Switcher */}
+            <button 
+              onClick={() => setViewMode('mobile-field')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: '1px solid var(--border-color)',
+                background: 'rgba(255,255,255,0.03)',
+                color: '#fff',
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              <Smartphone size={12} style={{ color: 'var(--accent-color)' }} />
+              <span>Mobile Field Ops</span>
+            </button>
 
             <div className="role-switcher-container">
               <span className="role-switcher-label">GovOS Session:</span>

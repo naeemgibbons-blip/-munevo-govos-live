@@ -301,6 +301,72 @@ app.post('/api/organizations', async (req, res) => {
   }
 });
 
+// 6.5. POST /api/onboarding: Guided Setup Wizard
+app.post('/api/onboarding', async (req, res) => {
+  const { name, slug, templateType, adminEmail, invitedById } = req.body;
+  if (!name || !slug || !adminEmail) {
+    return res.status(400).json({ error: 'name, slug, and adminEmail are required' });
+  }
+
+  try {
+    const org = await prisma.organization.create({
+      data: { name, slug }
+    });
+
+    const rolesList: { name: string; permissions: string[] }[] = [];
+    
+    if (templateType === 'FULL' || templateType === 'STANDARD') {
+      rolesList.push(
+        { name: 'Mayor / City Manager', permissions: ['command-center', 'tracker', 'gis', 'permits', 'code-enforcement', 'legislative'] },
+        { name: 'City Clerk', permissions: ['command-center', 'tracker', 'legislative', 'open-records'] },
+        { name: 'Building Inspector', permissions: ['command-center', 'tracker', 'gis', 'permits', 'code-enforcement'] },
+        { name: 'Code Enforcement Officer', permissions: ['command-center', 'tracker', 'gis', 'code-enforcement'] },
+        { name: 'Finance Director', permissions: ['command-center', 'permits'] }
+      );
+    } else if (templateType === 'CORE') {
+      rolesList.push(
+        { name: 'Administrator', permissions: ['command-center', 'tracker', 'gis', 'permits', 'code-enforcement', 'legislative', 'open-records'] },
+        { name: 'Clerk', permissions: ['command-center', 'legislative', 'open-records'] },
+        { name: 'Inspector', permissions: ['command-center', 'tracker', 'code-enforcement'] }
+      );
+    }
+
+    for (const r of rolesList) {
+      const newRole = await prisma.customRole.create({
+        data: {
+          organizationId: org.id,
+          name: r.name
+        }
+      });
+      const permissionData = r.permissions.map(mod => ({
+        roleId: newRole.id,
+        module: mod,
+        canView: true,
+        canEdit: true
+      }));
+      await prisma.permission.createMany({
+        data: permissionData
+      });
+    }
+
+    const invite = await prisma.invite.create({
+      data: {
+        email: adminEmail,
+        isOrgAdmin: true,
+        organizationId: org.id,
+        invitedById: invitedById || 'simulated-user-global_admin',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
+
+    await recordAudit(org.id, invitedById || null, adminEmail, 'CREATE', 'OrganizationOnboarding', org.id, null, { org, invite });
+
+    res.status(201).json({ org, invite });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 7. GET /api/invites: List invites
 app.get('/api/invites', async (req, res) => {
   const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
@@ -351,6 +417,92 @@ app.get('/api/profiles', async (req, res) => {
       }
     });
     res.json(profiles);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10.5. GET /api/search: Cross-Module Search Engine
+app.get('/api/search', async (req, res) => {
+  const query = (req.query.q || '') as string;
+  const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+
+  if (!query || query.length < 2) {
+    return res.json({ properties: [], permits: [], tickets: [], records: [], businesses: [] });
+  }
+
+  try {
+    const filter = orgId ? { organizationId: orgId } : {};
+
+    // 1. Properties
+    const properties = await prisma.property.findMany({
+      where: {
+        ...filter,
+        OR: [
+          { address: { contains: query, mode: 'insensitive' } },
+          { ownerName: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      take: 5
+    });
+
+    // 2. Permits
+    const permits = await prisma.permit.findMany({
+      where: {
+        ...filter,
+        OR: [
+          { permitNumber: { contains: query, mode: 'insensitive' } },
+          { type: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      include: { property: true },
+      take: 5
+    });
+
+    // 3. Tickets (TrackerItem)
+    const tickets = await prisma.trackerItem.findMany({
+      where: {
+        ...filter,
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { status: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      include: { property: true },
+      take: 5
+    });
+
+    // 4. Open Records Requests
+    const records = await prisma.openRecordsRequest.findMany({
+      where: {
+        ...filter,
+        OR: [
+          { requesterName: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      take: 5
+    });
+
+    // 5. Businesses
+    const businesses = await prisma.business.findMany({
+      where: {
+        ...filter,
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { sector: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      take: 5
+    });
+
+    res.json({
+      properties: properties.map(p => ({ id: p.id, type: 'property', label: p.address, sub: `Owner: ${p.ownerName}` })),
+      permits: permits.map(p => ({ id: p.id, type: 'permit', label: `${p.permitNumber} (${p.type})`, sub: p.property?.address || 'N/A' })),
+      tickets: tickets.map(t => ({ id: t.id, type: 'permit', label: t.title, sub: `Ticket: ${t.module} • ${t.status}` })),
+      records: records.map(r => ({ id: r.id, type: 'property', label: `FOIA: ${r.requesterName}`, sub: r.description })),
+      businesses: businesses.map(b => ({ id: b.id, type: 'business', label: b.name, sub: `Sector: ${b.sector}` }))
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

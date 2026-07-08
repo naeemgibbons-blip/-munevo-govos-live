@@ -14,6 +14,27 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+// Leaflet Imports
+import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+
+const createCustomIcon = (color: string) => {
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div style="background-color: ${color}; width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+};
+
+const mapCoordsToLatLng = (coords: [number, number]): [number, number] => {
+  const [x, y] = coords;
+  const lat = 40.735657 - (y - 250) * 0.00005;
+  const lng = -74.172367 + (x - 250) * 0.00008;
+  return [lat, lng];
+};
+
 interface GisMapProps {
   activePropertyId: string | null;
   onSelectProperty: (id: string) => void;
@@ -48,6 +69,10 @@ export const GisMap: React.FC<GisMapProps> = ({
 
   // Spatial Intelligence Analysis State
   const [spatialAnalysisType, setSpatialAnalysisType] = useState<string | null>(null);
+
+  // Filters State
+  const [filterType, setFilterType] = useState<string>('All');
+  const [filterStatus, setFilterStatus] = useState<string>('All');
 
   const propertiesList = Object.values(PROPERTIES);
 
@@ -103,181 +128,167 @@ export const GisMap: React.FC<GisMapProps> = ({
           </div>
         </div>
 
-        {/* GIS Canvas Rendering (Pure Vector SVG) */}
+        {/* Map Filter Controls */}
+        <div style={{ display: 'flex', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Type:</span>
+            <select 
+              value={filterType} 
+              onChange={e => setFilterType(e.target.value)}
+              style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}
+            >
+              <option value="All">All Types</option>
+              <option value="Properties">Properties Only</option>
+              <option value="Permits">Permits Only</option>
+              <option value="Tickets">Tracker Cases / 311</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Status:</span>
+            <select 
+              value={filterStatus} 
+              onChange={e => setFilterStatus(e.target.value)}
+              style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}
+            >
+              <option value="All">All Statuses</option>
+              <option value="Active">Active / Open</option>
+              <option value="Resolved">Resolved / Completed</option>
+            </select>
+          </div>
+        </div>
+
+        {/* GIS Canvas Rendering (Leaflet Interactive Map) */}
         <div style={{ 
-          background: 'radial-gradient(circle at center, #0d1629 0%, #050a16 100%)', 
+          background: '#0d1629', 
           border: '1px solid var(--border-color)', 
           borderRadius: '10px', 
           overflow: 'hidden', 
           height: '420px', 
-          position: 'relative' 
+          position: 'relative',
+          zIndex: 1
         }}>
-          
-          <svg viewBox="0 0 500 500" className="gis-svg" style={{ width: '100%', height: '100%' }}>
-            
-            {/* Defs for zoning colors */}
-            <defs>
-              <pattern id="diagonalHatch" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-                <line x1="0" y1="0" x2="0" y2="10" style={{ stroke: 'rgba(239, 68, 68, 0.15)', strokeWidth: 2 }} />
-              </pattern>
-            </defs>
+          <MapContainer 
+            center={[40.735657, -74.172367]} 
+            zoom={16} 
+            style={{ width: '100%', height: '100%' }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
-            {/* Base Grid */}
-            <rect width="500" height="500" fill="transparent"/>
-
-            {/* Zoning Overlays */}
-            {layers.zoning && (
-              <>
-                {/* Downtown Commercial (Violet Overlay) */}
-                <rect x="200" y="280" width="150" height="100" fill="rgba(168, 85, 247, 0.12)" stroke="rgba(168, 85, 247, 0.3)" strokeDasharray="3,3" />
-                {/* Residential (Green Overlay) */}
-                <rect x="100" y="50" width="160" height="180" fill="rgba(34, 197, 94, 0.08)" stroke="rgba(34, 197, 94, 0.2)" strokeDasharray="3,3" />
-                {/* Ironbound Mixed Use (Orange Overlay) */}
-                <rect x="340" y="320" width="140" height="160" fill="rgba(249, 115, 22, 0.1)" stroke="rgba(249, 115, 22, 0.25)" strokeDasharray="3,3" />
-              </>
-            )}
-
-            {/* Administrative Wards (Dashed white boundaries) */}
-            {layers.wards && (
-              <>
-                {/* North Ward Boundary Line */}
-                <line x1="0" y1="210" x2="500" y2="210" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeDasharray="6,6" />
-                <text x="20" y="200" fill="var(--text-muted)" fontSize="8px" fontWeight="bold">NORTH WARD (DISTRICT 1)</text>
-
-                {/* East Ward (Ironbound) Boundary Line */}
-                <path d="M 250 210 Q 300 310 500 310" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeDasharray="6,6" />
-                <text x="380" y="295" fill="var(--text-muted)" fontSize="8px" fontWeight="bold">EAST WARD (IRONBOUND)</text>
-
-                {/* Central Ward Label */}
-                <text x="20" y="235" fill="var(--text-muted)" fontSize="8px" fontWeight="bold">CENTRAL WARD (DISTRICT 2)</text>
-              </>
-            )}
-
-            {/* Utility Grid: Water Mains (Blue Pipe Lines) */}
-            {layers.waterMains && (
-              <g opacity="0.85">
-                <line x1="252" y1="0" x2="252" y2="500" stroke="var(--primary-color)" strokeWidth="1.5" />
-                <line x1="0" y1="312" x2="500" y2="312" stroke="var(--primary-color)" strokeWidth="1.2" />
-                <path d="M 252 312 L 500 482" stroke="var(--primary-color)" strokeWidth="1.2" fill="none" />
-                <line x1="162" y1="0" x2="162" y2="500" stroke="var(--primary-color)" strokeWidth="1.0" />
-                {/* Pressure Valve Indicators */}
-                <circle cx="252" cy="312" r="3" fill="#60a5fa" />
-                <circle cx="162" cy="150" r="3" fill="#60a5fa" />
-              </g>
-            )}
-
-            {/* Utility Grid: Sewer Mains (Brown/Green Flow Lines) */}
-            {layers.sewerLines && (
-              <g opacity="0.85">
-                <line x1="248" y1="0" x2="248" y2="500" stroke="#16a34a" strokeWidth="2" strokeDasharray="4,4" />
-                <line x1="0" y1="308" x2="500" y2="308" stroke="#16a34a" strokeWidth="1.5" strokeDasharray="4,4" />
-                <line x1="158" y1="0" x2="158" y2="500" stroke="#16a34a" strokeWidth="1.5" strokeDasharray="4,4" />
-                {/* Manhole Junctions */}
-                <rect x="245" y="305" width="6" height="6" fill="#84cc16" />
-                <rect x="155" y="147" width="6" height="6" fill="#84cc16" />
-              </g>
-            )}
-
-            {/* Road network base (rendered under parcels if layers enabled) */}
-            <line x1="250" y1="0" x2="250" y2="500" className="gis-street" strokeWidth="6" />
-            <line x1="0" y1="310" x2="500" y2="310" className="gis-street" strokeWidth="5" />
-            <path d="M 250 310 L 500 480" className="gis-street" strokeWidth="5" />
-            <line x1="160" y1="0" x2="160" y2="500" className="gis-street" strokeWidth="4" />
-            <line x1="160" y1="150" x2="250" y2="150" className="gis-street" strokeWidth="3" />
-            <line x1="330" y1="0" x2="330" y2="500" className="gis-street" strokeWidth="3.5" />
-
-            {/* Property Parcels Boundaries */}
-            {layers.parcels && propertiesList.map((prop) => {
-              const isActive = activePropertyId === prop.id;
-              const [x, y] = prop.gisCoords;
-              const size = prop.id === 'prop_01' ? 45 : prop.id === 'prop_05' || prop.id === 'prop_06' ? 22 : 30;
-              const px = x - size / 2;
-              const py = y - size / 2;
+            {/* Render Properties Pins */}
+            {(filterType === 'All' || filterType === 'Properties') && layers.parcels && propertiesList.map(prop => {
+              const latlng = mapCoordsToLatLng(prop.gisCoords);
+              // Filter status check
+              if (filterStatus === 'Resolved' && prop.taxStatus !== 'Paid') return null;
+              if (filterStatus === 'Active' && prop.taxStatus === 'Paid') return null;
 
               return (
-                <g key={prop.id} onClick={() => onSelectProperty(prop.id)}>
-                  <rect
-                    x={px}
-                    y={py}
-                    width={size}
-                    height={size}
-                    rx="4"
-                    className={`gis-parcel ${isActive ? 'active' : ''}`}
-                    style={{
-                      fill: isActive ? 'rgba(var(--accent-hue), var(--accent-sat), 30%, 0.4)' : ''
-                    }}
-                  />
-                  <text
-                    x={x}
-                    y={y + 3}
-                    textAnchor="middle"
-                    fill="#fff"
-                    fontSize="7px"
-                    fontWeight="bold"
-                    pointerEvents="none"
+                <Marker 
+                  key={prop.id} 
+                  position={latlng} 
+                  icon={createCustomIcon(activePropertyId === prop.id ? 'var(--accent-color)' : '#3b82f6')}
+                >
+                  <Popup>
+                    <div style={{ fontSize: '11px', color: '#333', lineHeight: '1.4' }}>
+                      <strong style={{ display: 'block', fontSize: '12px' }}>{prop.address}</strong>
+                      <span>Owner: {prop.ownerName}</span><br />
+                      <span>Value: ${prop.assessedValue.toLocaleString()}</span><br />
+                      <span>Tax Status: <strong style={{ color: prop.taxStatus === 'Paid' ? 'green' : 'red' }}>{prop.taxStatus}</strong></span>
+                      <button 
+                        onClick={() => {
+                          onSelectProperty(prop.id);
+                          onOpenChart('property', prop.id);
+                        }}
+                        style={{ display: 'block', marginTop: '6px', background: 'var(--primary-color)', color: '#fff', border: 0, padding: '4px 8px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Open Property Chart
+                      </button>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+
+            {/* Render Permits Pins */}
+            {(filterType === 'All' || filterType === 'Permits') && (
+              // Seed permits at property coordinates with small offset
+              propertiesList.map(prop => {
+                const latlng = mapCoordsToLatLng(prop.gisCoords);
+                const offsetLatlng: [number, number] = [latlng[0] + 0.0001, latlng[1] + 0.0001];
+
+                return (
+                  <Marker 
+                    key={`perm-${prop.id}`} 
+                    position={offsetLatlng} 
+                    icon={createCustomIcon('#10b981')}
                   >
-                    {prop.id === 'prop_01' ? 'HALL' : prop.id === 'prop_02' ? 'WASH' : prop.id === 'prop_03' ? 'BAKE' : prop.id === 'prop_04' ? 'RETL' : prop.id === 'prop_05' ? '125' : '129'}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Spatial Analysis Overlay Buffer Circle */}
-            {spatialAnalysisType === 'schools' && (
-              <g opacity="0.35">
-                {/* 150px buffer zone around schools (represented by prop_01/hall near school zones) */}
-                <circle cx="230" cy="150" r="85" fill="rgba(239, 68, 68, 0.15)" stroke="var(--danger-text)" strokeWidth="1.5" strokeDasharray="3,3" />
-                <circle cx="230" cy="150" r="5" fill="var(--danger-text)" />
-                <text x="230" y="138" fill="var(--danger-text)" fontSize="7px" fontWeight="bold" textAnchor="middle">SCHOOL ENFORCEMENT BUFFER</text>
-              </g>
+                    <Popup>
+                      <div style={{ fontSize: '11px', color: '#333', lineHeight: '1.4' }}>
+                        <strong style={{ display: 'block', fontSize: '12px' }}>Building Permit Desk</strong>
+                        <span>Ref Address: {prop.address}</span><br />
+                        <span>Work Scope: Foundation Structural restoration</span>
+                        <button 
+                          onClick={() => onOpenChart('permit', 'perm_02')}
+                          style={{ display: 'block', marginTop: '6px', background: '#10b981', color: '#fff', border: 0, padding: '4px 8px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          Open Permit Details
+                        </button>
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })
             )}
 
-            {/* Spatial Analysis Route lines */}
-            {spatialAnalysisType === 'route' && (
-              <path 
-                d="M 250 350 L 330 310 L 310 310 L 230 150 L 420 410" 
-                fill="none" 
-                stroke="var(--accent-color)" 
-                strokeWidth="2.5" 
-                strokeDasharray="5,3"
-                style={{ filter: 'drop-shadow(0 0 8px var(--accent-color))' }}
-              />
-            )}
-
-            {/* Render Pins */}
-            {pins.map((pin) => {
-              const [x, y] = pin.coords;
-              const color =
-                pin.type === 'violation'
-                  ? 'var(--danger-text)'
-                  : pin.type === 'request'
-                  ? 'var(--warning-text)'
-                  : 'var(--primary-color)';
+            {/* Render 311 / Code Cases Pins */}
+            {(filterType === 'All' || filterType === 'Tickets') && pins.map(pin => {
+              const latlng = mapCoordsToLatLng(pin.coords);
+              const color = pin.type === 'violation' ? '#ef4444' : '#f59e0b';
+              
+              if (filterStatus === 'Resolved' && pin.label.includes('Open')) return null;
+              if (filterStatus === 'Active' && pin.label.includes('Resolved')) return null;
 
               return (
-                <g key={pin.id} className="gis-pin" transform={`translate(${x}, ${y - 12})`}>
-                  <title>{`${pin.id}: ${pin.label}`}</title>
-                  <path
-                    d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
-                    fill={color}
-                    transform="scale(0.8) translate(-12, -22)"
-                  />
-                </g>
+                <Marker 
+                  key={pin.id} 
+                  position={latlng} 
+                  icon={createCustomIcon(color)}
+                >
+                  <Popup>
+                    <div style={{ fontSize: '11px', color: '#333', lineHeight: '1.4' }}>
+                      <strong style={{ display: 'block', fontSize: '12px', color: '#ef4444' }}>{pin.type.toUpperCase()}: {pin.id}</strong>
+                      <span>{pin.label}</span>
+                      <button 
+                        onClick={() => onOpenChart('property', 'prop_01')}
+                        style={{ display: 'block', marginTop: '6px', background: '#ef4444', color: '#fff', border: 0, padding: '4px 8px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Inspect Associated Property
+                      </button>
+                    </div>
+                  </Popup>
+                </Marker>
               );
             })}
 
-            {/* Geocode Search Results Pin */}
+            {/* Resolved search address marker */}
             {resolvedAddress && (
-              <g className="gis-pin" transform={`translate(${resolvedAddress.parcelCoords[0]}, ${resolvedAddress.parcelCoords[1] - 12})`}>
-                <circle cx="0" cy="0" r="14" fill="rgba(245, 158, 11, 0.15)" stroke="var(--accent-color)" strokeWidth="1" strokeDasharray="3,3" />
-                <path
-                  d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
-                  fill="var(--accent-color)"
-                  transform="scale(0.9) translate(-12, -22)"
-                />
-              </g>
+              <Marker 
+                position={[resolvedAddress.lat, resolvedAddress.lng]} 
+                icon={createCustomIcon('#d97706')}
+              >
+                <Popup>
+                  <div style={{ fontSize: '11px', color: '#333' }}>
+                    <strong>Geocoded Search Result</strong><br />
+                    <span>{resolvedAddress.normalizedAddress}</span>
+                  </div>
+                </Popup>
+              </Marker>
             )}
-          </svg>
+
+          </MapContainer>
         </div>
 
         {/* Map Legend */}

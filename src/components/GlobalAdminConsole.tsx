@@ -9,7 +9,8 @@ import {
   ShieldAlert,
   Globe,
   Loader2,
-  Lock
+  Lock,
+  X
 } from 'lucide-react';
 
 interface Organization {
@@ -63,6 +64,13 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'GLOBAL_ADMIN' | 'ORG_ADMIN' | 'STAFF'>('STAFF');
   const [inviteOrgId, setInviteOrgId] = useState('');
+
+  // Setup Onboarding Wizard States
+  const [wizardStep, setWizardStep] = useState(0); 
+  const [wizardOrgName, setWizardOrgName] = useState('');
+  const [wizardOrgSlug, setWizardOrgSlug] = useState('');
+  const [wizardTemplate, setWizardTemplate] = useState<'STANDARD' | 'CORE' | 'BLANK'>('STANDARD');
+  const [wizardAdminEmail, setWizardAdminEmail] = useState('');
 
   // Fetch Data
   const fetchData = async () => {
@@ -154,6 +162,41 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
     }
   };
 
+  const handleOnboardingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!wizardOrgName || !wizardOrgSlug || !wizardAdminEmail) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/onboarding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: wizardOrgName,
+          slug: wizardOrgSlug.toLowerCase().replace(/\s+/g, '-'),
+          templateType: wizardTemplate,
+          adminEmail: wizardAdminEmail,
+          invitedById: currentProfile?.id || 'simulated-user-global_admin'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        addNotification(`Onboarding complete! Organization "${data.org.name}" deployed. Role matrix configured.`);
+        setWizardStep(0);
+        setWizardOrgName('');
+        setWizardOrgSlug('');
+        setWizardAdminEmail('');
+        fetchData();
+      } else {
+        const err = await res.json();
+        addNotification(`Onboarding Error: ${err.error || 'Failed to initialize tenant'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      addNotification('API Error during municipal onboarding.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full gap-4 text-slate-400 p-24" style={{ height: '70vh' }}>
@@ -185,46 +228,22 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
         
         {/* Form 1: Create Municipality */}
-        <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <Building2 className="text-amber-500" size={20} />
-            <h2 className="font-display" style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>Register New Municipality</h2>
+        <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', justifyItems: 'center', justifyContent: 'center', alignItems: 'center', gap: '12px', minHeight: '220px', textAlign: 'center' }}>
+          <Building2 className="text-amber-500" size={36} style={{ opacity: 0.8 }} />
+          <div>
+            <h2 className="font-display" style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 6px 0', color: '#fff' }}>Guided Tenant Onboarding</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '280px', margin: 0 }}>
+              Deploy a new municipality, configure its custom roles from municipal templates, and issue its primary administrator credentials in a single step.
+            </p>
           </div>
-          <form onSubmit={handleCreateOrg} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Organization Name</label>
-              <input 
-                type="text" 
-                placeholder="e.g. City of Austin" 
-                value={orgName}
-                onChange={e => {
-                  setOrgName(e.target.value);
-                  setOrgSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'));
-                }}
-                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Tenant Slug (URL Identity)</label>
-              <input 
-                type="text" 
-                placeholder="e.g. austin" 
-                value={orgSlug}
-                onChange={e => setOrgSlug(e.target.value.toLowerCase())}
-                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}
-                required
-              />
-            </div>
-            <button 
-              type="submit" 
-              className="accent-gradient-btn"
-              style={{ padding: '12px', borderRadius: '8px', border: 0, color: '#000', background: 'linear-gradient(135deg, #f59e0b, #d97706)', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '8px' }}
-            >
-              <Building2 size={16} />
-              Register Organization
-            </button>
-          </form>
+          <button 
+            onClick={() => setWizardStep(1)}
+            className="accent-gradient-btn"
+            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 0, color: '#000', background: 'linear-gradient(135deg, #f59e0b, #d97706)', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '10px' }}
+          >
+            <Globe size={16} />
+            Launch Setup Wizard
+          </button>
         </div>
 
         {/* Form 2: Send User Invite */}
@@ -365,6 +384,155 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
         </div>
 
       </div>
+
+      {/* Setup Onboarding Wizard Dialog */}
+      {wizardStep > 0 && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }}>
+          <div className="glass-card animate-fade-in" style={{ width: '480px', padding: '28px', background: '#11131c', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>Municipal Onboarding Setup</h3>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Step {wizardStep} of 3</span>
+              </div>
+              <button 
+                onClick={() => setWizardStep(0)}
+                style={{ background: 'transparent', border: 0, color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Step Content */}
+            <form onSubmit={handleOnboardingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              
+              {/* Step 1: Org Details */}
+              {wizardStep === 1 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Organization Name</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. City of Austin" 
+                      value={wizardOrgName}
+                      onChange={e => {
+                        setWizardOrgName(e.target.value);
+                        setWizardOrgSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'));
+                      }}
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Tenant Slug Identifier</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. austin" 
+                      value={wizardOrgSlug}
+                      onChange={e => setWizardOrgSlug(e.target.value.toLowerCase())}
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}
+                      required
+                    />
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => { if (wizardOrgName && wizardOrgSlug) setWizardStep(2); }}
+                    className="accent-gradient-btn"
+                    style={{ width: '100%', padding: '10px', marginTop: '8px', color: '#000', background: 'linear-gradient(135deg, #f59e0b, #d97706)', border: 0, borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Next: Select Role Matrix Template
+                  </button>
+                </div>
+              )}
+
+              {/* Step 2: Role Template */}
+              {wizardStep === 2 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)' }}>Choose Seed Roles & Permissions Template</label>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div 
+                      onClick={() => setWizardTemplate('STANDARD')}
+                      style={{ padding: '12px', borderRadius: '8px', border: `1px solid ${wizardTemplate === 'STANDARD' ? 'var(--primary-color)' : 'rgba(255,255,255,0.06)'}`, background: wizardTemplate === 'STANDARD' ? 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.1)' : 'rgba(255,255,255,0.01)', cursor: 'pointer' }}
+                    >
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Standard Municipal Template</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>Seeds 5 core roles: Mayor, City Clerk, Building Inspector, Code Officer, and Finance Director with module permissions.</div>
+                    </div>
+
+                    <div 
+                      onClick={() => setWizardTemplate('CORE')}
+                      style={{ padding: '12px', borderRadius: '8px', border: `1px solid ${wizardTemplate === 'CORE' ? 'var(--primary-color)' : 'rgba(255,255,255,0.06)'}`, background: wizardTemplate === 'CORE' ? 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.1)' : 'rgba(255,255,255,0.01)', cursor: 'pointer' }}
+                    >
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Core Team Template</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>Seeds 3 basic admin/clerk roles for rapid deployment.</div>
+                    </div>
+
+                    <div 
+                      onClick={() => setWizardTemplate('BLANK')}
+                      style={{ padding: '12px', borderRadius: '8px', border: `1px solid ${wizardTemplate === 'BLANK' ? 'var(--primary-color)' : 'rgba(255,255,255,0.06)'}`, background: wizardTemplate === 'BLANK' ? 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.1)' : 'rgba(255,255,255,0.01)', cursor: 'pointer' }}
+                    >
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Blank Slate</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>Start with clean roles slate; configuration managed later in Org Console.</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setWizardStep(1)}
+                      style={{ flex: 1, padding: '10px', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', borderRadius: '6px', cursor: 'pointer' }}
+                    >
+                      Back
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setWizardStep(3)}
+                      style={{ flex: 1, padding: '10px', color: '#000', background: 'linear-gradient(135deg, #f59e0b, #d97706)', border: 0, borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Next: Primary Admin Invite
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Dispatch Admin Invite */}
+              {wizardStep === 3 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>First Administrator Email</label>
+                    <input 
+                      type="email" 
+                      placeholder="e.g. mayor@austin.gov" 
+                      value={wizardAdminEmail}
+                      onChange={e => setWizardAdminEmail(e.target.value)}
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setWizardStep(2)}
+                      style={{ flex: 1, padding: '10px', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', borderRadius: '6px', cursor: 'pointer' }}
+                    >
+                      Back
+                    </button>
+                    <button 
+                      type="submit" 
+                      style={{ flex: 1, padding: '10px', color: '#000', background: 'linear-gradient(135deg, #f59e0b, #d97706)', border: 0, borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Complete Onboarding
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
