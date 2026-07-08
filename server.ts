@@ -173,12 +173,12 @@ app.post('/api/tracker', async (req, res) => {
     const newItem = await prisma.trackerItem.create({
       data: {
         organizationId: orgId,
-        module,
+        module: module || '311',
         title,
-        status,
-        priority,
-        assignedTo,
-        slaDays,
+        status: status || 'Open',
+        priority: priority || 'Medium',
+        assignedTo: assignedTo || 'Marcus Miller',
+        slaDays: slaDays || 14,
         slaProgress: 0,
         propertyId: property.id
       },
@@ -473,6 +473,132 @@ app.put('/api/custom-roles/:id/permissions', async (req, res) => {
     res.json(updatedRole);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// 14. POST: AI Suggested routing classification
+app.post('/api/ai/suggest-routing', async (req, res) => {
+  const { description, organizationId } = req.body;
+  if (!description || !organizationId) {
+    return res.status(400).json({ error: 'description and organizationId are required' });
+  }
+
+  try {
+    const text = description.toLowerCase();
+    let suggestedModule = 'tracker'; 
+    let suggestedRoleName = 'Resident Services Coordinator';
+    let suggestedAssignee = 'Marcus Miller';
+    let rationale = 'Default ticket classification for general resident inquiries.';
+
+    if (text.includes('leak') || text.includes('pressure') || text.includes('water') || text.includes('pipe') || text.includes('hydrant')) {
+      suggestedModule = 'tracker';
+      suggestedRoleName = 'Water Dept Lead';
+      suggestedAssignee = 'Marcus Miller';
+      rationale = 'The request mentions issues with water pressure or leakage, which fall under the Water Department lead.';
+    } else if (text.includes('pothole') || text.includes('street') || text.includes('road') || text.includes('paving') || text.includes('traffic')) {
+      suggestedModule = 'tracker';
+      suggestedRoleName = 'Streets & Roads Coordinator';
+      suggestedAssignee = 'Marcus Miller';
+      rationale = 'The incident pertains to municipal road maintenance and traffic infrastructure, managed by the Streets Coordinator.';
+    } else if (text.includes('trash') || text.includes('debris') || text.includes('garbage') || text.includes('overgrowth') || text.includes('litter')) {
+      suggestedModule = 'code-enforcement';
+      suggestedRoleName = 'Property Maintenance Inspector';
+      suggestedAssignee = 'Elena Rostova';
+      rationale = 'Identified trash, debris, or overgrowth violation. Property maintenance inspections are required.';
+    } else if (text.includes('structural') || text.includes('unsafe') || text.includes('collapse') || text.includes('foundation') || text.includes('hazard')) {
+      suggestedModule = 'code-enforcement';
+      suggestedRoleName = 'Building Inspector';
+      suggestedAssignee = 'Elena Rostova';
+      rationale = 'The details indicate possible structural hazards or unsafe conditions requiring safety inspection.';
+    } else if (text.includes('permit') || text.includes('zoning') || text.includes('renovation') || text.includes('licensing') || text.includes('building cost')) {
+      suggestedModule = 'permits';
+      suggestedRoleName = 'Permits Clerk';
+      suggestedAssignee = 'Elena Rostova';
+      rationale = 'The request relates directly to municipal building permitting, zoning desk reviews, or construction licenses.';
+    }
+
+    // Find the role ID in the database for the matching organization
+    const targetRole = await prisma.customRole.findFirst({
+      where: {
+        organizationId,
+        name: { equals: suggestedRoleName, mode: 'insensitive' }
+      }
+    });
+
+    res.json({
+      suggestedModule,
+      suggestedRoleName,
+      suggestedRoleId: targetRole?.id || null,
+      suggestedAssignee,
+      rationale
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 15. GET: Fetch all Open Records Requests (filtered by organization)
+app.get('/api/open-records', async (req, res) => {
+  try {
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    
+    if (!orgId) {
+      orgId = await getNewarkOrgId();
+    }
+
+    const requests = await prisma.openRecordsRequest.findMany({
+      where: { organizationId: orgId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(requests);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 16. POST: Create a new Open Records Request
+app.post('/api/open-records', async (req, res) => {
+  try {
+    const { requesterName, requesterEmail, description, dateRange, status, assignedTo } = req.body;
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    
+    if (!orgId) {
+      orgId = await getNewarkOrgId();
+    }
+
+    const newRequest = await prisma.openRecordsRequest.create({
+      data: {
+        organizationId: orgId,
+        requesterName,
+        requesterEmail,
+        description,
+        dateRange: dateRange || null,
+        status: status || 'Received',
+        assignedTo: assignedTo || 'City Clerk'
+      }
+    });
+
+    res.status(201).json(newRequest);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 17. PUT: Update an Open Records Request status/assignee
+app.put('/api/open-records/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, assignedTo } = req.body;
+
+    const updated = await prisma.openRecordsRequest.update({
+      where: { id },
+      data: { status, assignedTo }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 

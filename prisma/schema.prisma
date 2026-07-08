@@ -10,21 +10,22 @@ generator client {
 
 // 1. Organization (Municipality)
 model Organization {
-  id           String        @id @default(uuid())
-  name         String        @unique // e.g., "City of Newark"
-  slug         String        @unique // e.g., "newark"
-  createdAt    DateTime      @default(now())
+  id                  String               @id @default(uuid())
+  name                String               @unique // e.g., "City of Newark"
+  slug                String               @unique // e.g., "newark"
+  createdAt           DateTime             @default(now())
   
   // Relations
-  profiles     Profile[]
-  customRoles  CustomRole[]
-  properties   Property[]
-  businesses   Business[]
-  projects     Project[]
-  permits      Permit[]
-  inspections  Inspection[]
-  trackerItems TrackerItem[]
-  invites      Invite[]
+  profiles            Profile[]
+  customRoles         CustomRole[]
+  properties          Property[]
+  businesses          Business[]
+  projects            Project[]
+  permits             Permit[]
+  inspections         Inspection[]
+  trackerItems        TrackerItem[]
+  invites             Invite[]
+  openRecordsRequests OpenRecordsRequest[]
 }
 
 // 2. Custom Role System (Isolated Per Org)
@@ -48,7 +49,7 @@ model Permission {
   id             String        @id @default(uuid())
   roleId         String
   role           CustomRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  module         String        // "command-center" | "tracker" | "gis" | "permits" | "code-enforcement" | "legislative"
+  module         String        // "command-center" | "tracker" | "gis" | "permits" | "code-enforcement" | "legislative" | "open-records"
   canView        Boolean       @default(false)
   canEdit        Boolean       @default(false)
   createdAt      DateTime      @default(now())
@@ -176,4 +177,20 @@ model TrackerItem {
   reportedDate   DateTime       @default(now())
   propertyId     String
   property       Property       @relation(fields: [propertyId], references: [id])
+}
+
+// 6. NEW MODEL: Open Records (FOIA-style Requests)
+model OpenRecordsRequest {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  requesterName  String
+  requesterEmail String
+  description    String
+  dateRange      String?
+  status         String       @default("Received") // "Received" | "Under Review" | "Fulfilled" | "Denied"
+  assignedTo     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }

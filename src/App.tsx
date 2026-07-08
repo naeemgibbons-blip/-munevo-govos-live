@@ -9,6 +9,7 @@ import { LegislativeHub } from './components/LegislativeHub';
 import { IdentityConsole } from './components/IdentityConsole';
 import { GlobalAdminConsole } from './components/GlobalAdminConsole';
 import { OrgAdminConsole } from './components/OrgAdminConsole';
+import { OpenRecords } from './components/OpenRecords';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -468,6 +469,8 @@ function App() {
                     onOpenChart={handleOpenChart}
                     onOpenPropertyByAddress={handleOpenPropertyByAddress}
                     canEdit={canEditModule('tracker')}
+                    properties={properties}
+                    currentOrgId={currentOrgId}
                   />
                 )}
 
@@ -571,6 +574,14 @@ function App() {
                   <OrgAdminConsole 
                     currentProfile={currentProfile}
                     addNotification={addNotification}
+                  />
+                )}
+
+                {activeModule === 'open-records' && (
+                  <OpenRecords 
+                    currentProfile={currentProfile}
+                    addNotification={addNotification}
+                    canEdit={canEditModule('open-records')}
                   />
                 )}
               </>

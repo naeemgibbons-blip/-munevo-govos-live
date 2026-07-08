@@ -3,17 +3,17 @@ import { TrackerItem } from '../mockData';
 import { 
   Layers, 
   Search, 
-  Filter, 
   Clock, 
   X, 
   MessageSquare, 
   Paperclip, 
   History, 
-  Sliders, 
-  UserCheck, 
-  Compass,
-  ArrowRight,
-  Plus
+  Plus,
+  Loader2,
+  Sparkles,
+  CheckCircle,
+  XCircle,
+  HelpCircle
 } from 'lucide-react';
 
 interface UniversalTrackerProps {
@@ -22,6 +22,8 @@ interface UniversalTrackerProps {
   onOpenChart: (type: 'property' | 'permit' | 'legislative' | 'business', id: string) => void;
   onOpenPropertyByAddress: (address: string) => void;
   canEdit?: boolean;
+  properties?: Record<string, any>;
+  currentOrgId?: string;
 }
 
 export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
@@ -29,156 +31,244 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
   setTrackerItems,
   onOpenChart,
   onOpenPropertyByAddress,
-  canEdit = true
+  canEdit = true,
+  properties = {},
+  currentOrgId = ''
 }) => {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+  // Filters State
   const [searchTerm, setSearchTerm] = useState('');
   const [moduleFilter, setModuleFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
-  
-  // Selected tracker item for detailed workspace
-  const [selectedItemId, setSelectedItemId] = useState<string | null>('TRK-9832'); // Default to Market St awning
-  
-  // Local state for new comment
-  const [newComment, setNewComment] = useState('');
-  // Local state for fake attachment upload
-  const [uploadName, setUploadName] = useState('');
 
-  // Find selected item
-  const selectedItem = trackerItems.find(item => item.id === selectedItemId) || null;
+  // Selected item Workspace Drawer state
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  
+  // Custom Comment field local state
+  const [commentInput, setCommentInput] = useState('');
 
-  // Filter items
-  const filteredItems = trackerItems.filter(item => {
+  // Add Ticket Modal States
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newPriority, setNewPriority] = useState('Medium');
+
+  // AI Routing States
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<any | null>(null);
+
+  // Set default address when properties load
+  React.useEffect(() => {
+    const addresses = Object.values(properties).map((p: any) => p.address);
+    if (addresses.length > 0 && !newAddress) {
+      setNewAddress(addresses[0]);
+    }
+  }, [properties]);
+
+  const selectedItem = trackerItems.find(item => item.id === selectedItemId);
+
+  // Filter Items
+  const filteredItems = trackerItems.filter((item) => {
     const matchesSearch = 
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.address.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesModule = moduleFilter === 'All' || item.module === moduleFilter;
-    const matchesPriority = priorityFilter === 'All' || item.priority === priorityFilter;
+      item.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      item.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.title.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesModule = 
+      moduleFilter === 'All' || 
+      (moduleFilter === '311' && item.module === '311') ||
+      (moduleFilter === 'Permits' && item.module === 'Permits') ||
+      (moduleFilter === 'Inspections' && item.module === 'Inspections') ||
+      (moduleFilter === 'Code Enforcement' && item.module === 'Code Enforcement');
+
+    const matchesPriority = 
+      priorityFilter === 'All' || 
+      item.priority === priorityFilter;
 
     return matchesSearch && matchesModule && matchesPriority;
   });
 
-  // Handle workflow updates (status, priority, assignment)
-  const updateTrackerField = (itemId: string, field: keyof TrackerItem, value: any) => {
-    setTrackerItems(prev => prev.map(item => {
-      if (item.id === itemId) {
-        const auditAction = `Field '${String(field)}' updated to: ${value}`;
-        const updatedHistory = [
-          ...item.history,
-          { action: auditAction, user: 'Naeem Gibbons (GovOS Session)', date: 'Just now' }
-        ];
-        return { 
-          ...item, 
-          [field]: value,
-          history: updatedHistory
-        };
+  // Action update handler for fields
+  const updateTrackerField = (id: string, field: 'status' | 'priority' | 'assignedTo', val: string) => {
+    setTrackerItems(prev => prev.map((item) => {
+      if (item.id === id) {
+        return { ...item, [field]: val };
       }
       return item;
     }));
   };
 
-  // Add Comment
-  const handleAddComment = (e: React.FormEvent) => {
+  const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedItemId || !newComment.trim()) return;
+    if (!commentInput.trim() || !selectedItem) return;
+    
+    // Append locally
+    selectedItem.comments.unshift({
+      user: 'Naeem Gibbons',
+      text: commentInput,
+      date: 'Just now'
+    });
+    selectedItem.history.unshift({
+      action: 'Added comment: ' + commentInput,
+      user: 'Naeem Gibbons',
+      date: 'Just now'
+    });
 
-    setTrackerItems(prev => prev.map(item => {
-      if (item.id === selectedItemId) {
-        return {
-          ...item,
-          comments: [
-            ...item.comments,
-            { user: 'Naeem Gibbons (GovOS Session)', text: newComment, date: 'Just now' }
-          ],
-          history: [
-            ...item.history,
-            { action: 'Added Comment', user: 'Naeem Gibbons', date: 'Just now' }
-          ]
-        };
-      }
-      return item;
-    }));
-    setNewComment('');
+    setCommentInput('');
   };
 
-  // Simulate attachment upload
-  const handleUploadFile = (e: React.FormEvent) => {
+  // Run AI suggested routing engine
+  const handleAnalyzeTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedItemId || !uploadName.trim()) return;
+    if (!newTitle.trim() || !newDesc.trim() || !newAddress) return;
 
-    setTrackerItems(prev => prev.map(item => {
-      if (item.id === selectedItemId) {
-        return {
-          ...item,
-          attachments: [...item.attachments, uploadName],
-          history: [
-            ...item.history,
-            { action: `Attached file: ${uploadName}`, user: 'Naeem Gibbons', date: 'Just now' }
-          ]
-        };
+    try {
+      setAiAnalyzing(true);
+      const res = await fetch(`${API_URL}/api/ai/suggest-routing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: `${newTitle}. ${newDesc}`,
+          organizationId: currentOrgId
+        })
+      });
+
+      if (res.ok) {
+        const suggestion = await res.json();
+        setAiSuggestion(suggestion);
+      } else {
+        setAiSuggestion({
+          suggestedModule: 'tracker',
+          suggestedRoleName: 'Resident Services Coordinator',
+          suggestedAssignee: 'Marcus Miller',
+          rationale: 'Classification server offline. Defaulting to general operations queue.'
+        });
       }
-      return item;
-    }));
-    setUploadName('');
+    } catch (e) {
+      setAiSuggestion({
+        suggestedModule: 'tracker',
+        suggestedRoleName: 'Resident Services Coordinator',
+        suggestedAssignee: 'Marcus Miller',
+        rationale: 'Classification server offline. Defaulting to general operations queue.'
+      });
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
+
+  // Confirm and create ticket
+  const handleConfirmRoute = () => {
+    if (!aiSuggestion) return;
+
+    const newItem: TrackerItem = {
+      id: 'T-' + Math.floor(1000 + Math.random() * 9000),
+      module: aiSuggestion.suggestedModule === 'code-enforcement' ? 'Code Enforcement' : aiSuggestion.suggestedModule === 'permits' ? 'Permits' : '311',
+      title: newTitle,
+      status: 'Open',
+      priority: newPriority as any,
+      assignedTo: aiSuggestion.suggestedAssignee,
+      slaDays: 14,
+      slaProgress: 0,
+      reportedDate: new Date().toISOString().split('T')[0],
+      address: newAddress,
+      comments: [
+        { user: 'Munevo AI Companion', text: `Suggested Route: ${aiSuggestion.suggestedRoleName} (${aiSuggestion.suggestedAssignee}). Rationale: ${aiSuggestion.rationale}`, date: 'Just now' }
+      ],
+      history: [
+        { action: 'Ticket instantiated via AI routing confirmation', user: 'Munevo IT', date: 'Just now' }
+      ],
+      attachments: [],
+      relatedRecords: [],
+      customFields: {}
+    };
+
+    setTrackerItems(prev => [newItem, ...prev]);
+
+    // Reset Form
+    setNewTitle('');
+    setNewDesc('');
+    setAiSuggestion(null);
+    setShowAddModal(false);
+  };
+
+  const getPriorityBadgeClass = (priority: string) => {
+    if (priority === 'Critical') return 'badge-danger';
+    if (priority === 'High') return 'badge-warn';
+    if (priority === 'Medium') return 'badge-primary';
+    return 'badge-success';
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: selectedItem ? '1.1fr 0.9fr' : '1fr', gap: '20px', flex: 1, height: '100%', overflow: 'hidden' }}>
+    <div className="module-content-grid" style={{ height: '100%', overflow: 'hidden' }}>
       
-      {/* Left Column: Grid list */}
-      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
-        <div className="card-header" style={{ marginBottom: 0 }}>
-          <div className="card-title">
-            <Layers className="brand-gradient-text" size={18} />
-            <span>Universal Operations Tracker</span>
+      {/* Left Column: List Queue */}
+      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+        
+        {/* Module Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Layers className="logo-glow-cyan" size={18} />
+            <h2 className="font-display" style={{ fontSize: '1.2rem', fontWeight: 800 }}>Universal Operations Tracker</h2>
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Showing {filteredItems.length} of {trackerItems.length} records
-          </span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{filteredItems.length} active tickets</span>
         </div>
 
-        {/* Toolbar: Search, Filters */}
-        <div className="tracker-toolbar">
-          <div className="header-search" style={{ width: '240px' }}>
-            <input 
-              type="text" 
-              placeholder="Search ID, address..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Search className="header-search-icon" size={14} />
+        {/* Toolbar: Search, Filters, Add Button */}
+        <div className="tracker-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div className="header-search" style={{ width: '220px' }}>
+              <input 
+                type="text" 
+                placeholder="Search ID, address..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <Search className="header-search-icon" size={14} />
+            </div>
+
+            <div className="tracker-filters" style={{ display: 'flex', gap: '6px' }}>
+              <select 
+                className="select-filter" 
+                value={moduleFilter} 
+                onChange={(e) => setModuleFilter(e.target.value)}
+              >
+                <option value="All">All Modules</option>
+                <option value="311">311 requests</option>
+                <option value="Permits">Permits</option>
+                <option value="Inspections">Inspections</option>
+                <option value="Code Enforcement">Code Cases</option>
+              </select>
+
+              <select 
+                className="select-filter" 
+                value={priorityFilter} 
+                onChange={(e) => setPriorityFilter(e.target.value)}
+              >
+                <option value="All">All Priorities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
           </div>
 
-          <div className="tracker-filters">
-            <select 
-              className="select-filter" 
-              value={moduleFilter} 
-              onChange={(e) => setModuleFilter(e.target.value)}
+          {canEdit && (
+            <button 
+              onClick={() => setShowAddModal(true)} 
+              className="ai-btn-send"
+              style={{ height: '36px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
             >
-              <option value="All">All Modules</option>
-              <option value="311">311 requests</option>
-              <option value="Permits">Permits</option>
-              <option value="Inspections">Inspections</option>
-              <option value="Code Enforcement">Code Cases</option>
-            </select>
-
-            <select 
-              className="select-filter" 
-              value={priorityFilter} 
-              onChange={(e) => setPriorityFilter(e.target.value)}
-            >
-              <option value="All">All Priorities</option>
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
-          </div>
+              <Plus size={14} />
+              <span>New 311 Ticket</span>
+            </button>
+          )}
         </div>
 
         {/* Tracker Grid Table */}
-        <div className="tracker-table-container">
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           <table className="tracker-table">
             <thead>
               <tr>
@@ -241,27 +331,22 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
                       </span>
                     </td>
                     <td>
-                      <span style={{ 
-                        fontWeight: 700, 
-                        fontSize: '0.75rem',
-                        color: isCritical 
-                          ? 'var(--danger-text)' 
-                          : isHigh 
-                          ? 'var(--warning-text)' 
-                          : 'var(--text-secondary)'
-                      }}>
+                      <span className={`badge-status ${getPriorityBadgeClass(item.priority)}`} style={{ fontSize: '0.7rem' }}>
                         {item.priority}
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '80px' }}>
-                        <div className="sla-progress-bar">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '48px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
                           <div 
-                            className={`sla-progress-fill ${progressColorClass}`} 
-                            style={{ width: `${item.slaProgress}%` }}
+                            style={{ 
+                              width: `${item.slaProgress}%`, 
+                              height: '100%', 
+                              background: progressColorClass === 'danger' ? 'var(--danger-text)' : progressColorClass === 'warn' ? 'var(--warning-text)' : 'var(--success-text)' 
+                            }} 
                           />
                         </div>
-                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', minWidth: '24px', textAlign: 'right' }}>
                           {item.slaProgress}%
                         </span>
                       </div>
@@ -269,13 +354,6 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
                   </tr>
                 );
               })}
-              {filteredItems.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
-                    No operations tracker items found.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -389,119 +467,223 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}>
                 <Clock size={12} />
-                <span>SLA Expiry Timeline</span>
+                SLA Compliance Matrix
               </span>
-              <span style={{ fontWeight: 700, color: selectedItem.slaProgress > 80 ? 'var(--danger-text)' : 'var(--text-primary)' }}>
-                {selectedItem.slaDays} Days Limit ({selectedItem.slaProgress}% consumed)
-              </span>
+              <span style={{ color: 'var(--text-muted)', display: 'block', marginLeft: 'auto' }}>Limit: {selectedItem.slaDays} days</span>
             </div>
-            <div className="sla-progress-bar">
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.03)', borderRadius: '3px', overflow: 'hidden' }}>
               <div 
-                className={`sla-progress-fill ${selectedItem.slaProgress > 80 ? 'danger' : selectedItem.slaProgress > 50 ? 'warn' : ''}`}
-                style={{ width: `${selectedItem.slaProgress}%` }}
+                style={{ 
+                  width: `${selectedItem.slaProgress}%`, 
+                  height: '100%', 
+                  background: 'linear-gradient(90deg, var(--primary-color), var(--accent-color))' 
+                }} 
               />
             </div>
           </div>
 
-          {/* Custom Fields segment */}
-          <div style={{ background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-color)', marginBottom: '8px' }}>
-              <Sliders size={12} />
-              <span>Module Custom Fields</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.75rem' }}>
-              {Object.entries(selectedItem.customFields).map(([key, value]) => (
-                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'rgba(255,255,255,0.01)', padding: '6px', borderRadius: '4px', userSelect: 'none' }} contentEditable={false}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem', userSelect: 'none' }} contentEditable={false}>{key}</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600, userSelect: 'text' }} contentEditable={false}>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Attachments Section */}
-          <div>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
-              ATTACHMENTS ({selectedItem.attachments.length})
-            </span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {selectedItem.attachments.map((file, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  <Paperclip size={12} style={{ color: 'var(--primary-color)' }} />
-                  <span style={{ flex: 1 }}>{file}</span>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>MIME-Verified</span>
-                </div>
-              ))}
-              
-              <form onSubmit={handleUploadFile} style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                <input 
-                  type="text" 
-                  className="ai-input" 
-                  placeholder="Simulate uploading file..." 
-                  value={uploadName} 
-                  onChange={(e) => setUploadName(e.target.value)}
-                  style={{ fontSize: '0.75rem' }}
-                />
-                <button type="submit" className="ai-btn-send" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}>
-                  <Plus size={10} />
-                  <span>Attach</span>
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {/* Comments Feed */}
-          <div>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
-              COMMENTS FEED ({selectedItem.comments.length})
-            </span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto', marginBottom: '8px' }}>
-              {selectedItem.comments.map((comm, idx) => (
-                <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-color)', fontWeight: 'bold', fontSize: '0.7rem', marginBottom: '4px' }}>
-                    <span>{comm.user}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{comm.date}</span>
-                  </div>
-                  <p style={{ color: 'var(--text-secondary)', lineHeight: 1.4 }}>{comm.text}</p>
-                </div>
-              ))}
-              {selectedItem.comments.length === 0 && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '4px' }}>No comments recorded on this ticket.</span>
-              )}
+          {/* Comments Ledger Panel */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+              <MessageSquare size={14} />
+              <span>Operations Comments Ledger</span>
             </div>
 
-            <form onSubmit={handleAddComment} style={{ display: 'flex', gap: '8px' }}>
+            {/* Comment Form */}
+            <form onSubmit={handlePostComment} style={{ display: 'flex', gap: '6px' }}>
               <input 
                 type="text" 
                 className="ai-input" 
-                placeholder="Post an operational comment..." 
-                value={newComment} 
-                onChange={(e) => setNewComment(e.target.value)}
-                style={{ fontSize: '0.75rem' }}
-                required
+                placeholder="Log internal updates..."
+                value={commentInput}
+                onChange={e => setCommentInput(e.target.value)}
+                style={{ flex: 1, fontSize: '0.75rem', height: '32px' }}
               />
-              <button type="submit" className="ai-btn-send" style={{ fontSize: '0.75rem' }}>Post</button>
+              <button 
+                type="submit" 
+                className="ai-btn-send"
+                style={{ height: '32px', padding: '0 10px', fontSize: '0.75rem' }}
+              >
+                Send
+              </button>
             </form>
-          </div>
 
-          {/* Audit History Timeline */}
-          <div>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
-              TICKET AUDIT TRAILS
-            </span>
-            <div className="timeline" style={{ maxHeight: '150px', overflowY: 'auto' }}>
-              {selectedItem.history.map((hist, idx) => (
-                <div key={idx} className="timeline-item" style={{ gap: '10px' }}>
-                  <div className="timeline-node success" style={{ width: '8px', height: '8px' }} />
-                  <div className="timeline-info" style={{ gap: '0' }}>
-                    <span className="timeline-date" style={{ fontSize: '0.65rem' }}>{hist.date} • {hist.user}</span>
-                    <span className="timeline-title" style={{ fontSize: '0.75rem', fontWeight: 600 }}>{hist.action}</span>
+            {/* Comment list rendering */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {selectedItem.comments.map((c, i) => (
+                <div key={i} style={{ padding: '8px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 600 }}>{c.user}</span>
+                    <span>{c.date}</span>
                   </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{c.text}</div>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Actions & Related Records */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>RELATED PARCEL MAPS</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {selectedItem.relatedRecords.map((rec, i) => (
+                <button 
+                  key={i} 
+                  className="tab-button active"
+                  onClick={() => onOpenChart('property', rec.id)}
+                  style={{ fontSize: '0.7rem', padding: '4px 8px', height: '26px' }}
+                >
+                  {rec.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* AI Suggested Routing Popup Dialog Modal */}
+      {showAddModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }}>
+          <div className="glass-card animate-fade-in" style={{ width: '480px', display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px', border: '1px solid var(--border-color-glow)', background: '#11131c' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={16} className="text-emerald-400" />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#fff' }}>Create & Route 311 Incident</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowAddModal(false);
+                  setAiSuggestion(null);
+                }} 
+                style={{ background: 'transparent', border: 0, color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {!aiSuggestion ? (
+              /* Request Intake Form */
+              <form onSubmit={handleAnalyzeTicket} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ticket Title Summary</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Water leak on sidewalk"
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    required
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontSize: '12.5px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident Details & Description</label>
+                  <textarea 
+                    placeholder="Describe issue (e.g. Water bubbling up next to fire hydrant, blocking path)"
+                    value={newDesc}
+                    onChange={e => setNewDesc(e.target.value)}
+                    required
+                    style={{ width: '100%', minHeight: '80px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', lineHeight: '1.4' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location Address</label>
+                    <select 
+                      value={newAddress}
+                      onChange={e => setNewAddress(e.target.value)}
+                      style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', height: '36px' }}
+                    >
+                      {Object.values(properties).map((p: any) => (
+                        <option key={p.id} value={p.address}>{p.address}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Priority Level</label>
+                    <select 
+                      value={newPriority}
+                      onChange={e => setNewPriority(e.target.value)}
+                      style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', height: '36px' }}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={aiAnalyzing}
+                  style={{ padding: '10px 14px', borderRadius: '6px', border: 0, color: '#fff', background: 'linear-gradient(135deg, #10b981, #059669)', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '8px', fontSize: '13px' }}
+                >
+                  {aiAnalyzing ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} />
+                      <span>Munevo AI Companion routing ticket...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      <span>Route Ticket with Munevo AI</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* AI Suggestion Dialog Output */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '13px', fontWeight: 700 }}>
+                    <Sparkles size={14} />
+                    <span>AI Dispatch Suggestions:</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block' }}>TARGET MODULE</span>
+                      <strong style={{ color: '#fff', fontSize: '13px', display: 'block', marginTop: '2px' }}>
+                        {aiSuggestion.suggestedModule.replace('-', ' ').toUpperCase()}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block' }}>MUNICIPAL ASSIGNEE</span>
+                      <strong style={{ color: '#fff', fontSize: '13px', display: 'block', marginTop: '2px' }}>
+                        {aiSuggestion.suggestedAssignee} ({aiSuggestion.suggestedRoleName})
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>AI RECOMMENDATION RATIONALE</span>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '11.5px', lineHeight: '1.4', margin: '4px 0 0 0' }}>
+                      {aiSuggestion.rationale}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                  <button 
+                    onClick={() => setAiSuggestion(null)}
+                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+                  >
+                    Override / Re-classify
+                  </button>
+                  <button 
+                    onClick={handleConfirmRoute}
+                    style={{ padding: '8px 16px', borderRadius: '6px', border: 0, background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 600, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <CheckCircle size={12} />
+                    Confirm & Assign
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

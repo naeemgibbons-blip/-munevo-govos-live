@@ -97,6 +97,8 @@ ALTER TABLE public."Inspection" ENABLE ROW LEVEL SECURITY;
 -- SPLIT --
 ALTER TABLE public."TrackerItem" ENABLE ROW LEVEL SECURITY;
 -- SPLIT --
+ALTER TABLE public."OpenRecordsRequest" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
 -- 5. Drop existing policies to prevent conflicts on execution rerun
 DROP POLICY IF EXISTS organization_policy ON public."Organization";
 -- SPLIT --
@@ -119,6 +121,8 @@ DROP POLICY IF EXISTS permit_policy ON public."Permit";
 DROP POLICY IF EXISTS inspection_policy ON public."Inspection";
 -- SPLIT --
 DROP POLICY IF EXISTS tracker_policy ON public."TrackerItem";
+-- SPLIT --
+DROP POLICY IF EXISTS open_records_policy ON public."OpenRecordsRequest";
 -- SPLIT --
 -- 6. Define Organization Policies
 CREATE POLICY organization_policy ON public."Organization"
@@ -259,6 +263,21 @@ USING (
 )
 WITH CHECK (
   public.check_user_permission('tracker', true)
+);
+-- SPLIT --
+-- 17. Define Open Records Policies (Linked to 'open-records' module)
+CREATE POLICY open_records_policy ON public."OpenRecordsRequest"
+FOR ALL
+USING (
+  (
+    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+    OR
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+  )
+  AND public.check_user_permission('open-records', false)
+)
+WITH CHECK (
+  public.check_user_permission('open-records', true)
 );
 `;
 

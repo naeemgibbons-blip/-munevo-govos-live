@@ -25,7 +25,8 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
       { module: 'permits', canView: true, canEdit: false },
       { module: 'code-enforcement', canView: true, canEdit: false },
       { module: 'legislative', canView: true, canEdit: true },
-      { module: 'identity-security', canView: true, canEdit: false }
+      { module: 'identity-security', canView: true, canEdit: false },
+      { module: 'open-records', canView: true, canEdit: false }
     ]
   },
   {
@@ -37,7 +38,8 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
       { module: 'permits', canView: true, canEdit: false },
       { module: 'code-enforcement', canView: true, canEdit: false },
       { module: 'legislative', canView: true, canEdit: false },
-      { module: 'identity-security', canView: true, canEdit: false }
+      { module: 'identity-security', canView: true, canEdit: false },
+      { module: 'open-records', canView: true, canEdit: false }
     ]
   },
   {
@@ -231,7 +233,8 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
     permissions: [
       { module: 'command-center', canView: true, canEdit: false },
       { module: 'legislative', canView: true, canEdit: true },
-      { module: 'tracker', canView: true, canEdit: false }
+      { module: 'tracker', canView: true, canEdit: false },
+      { module: 'open-records', canView: true, canEdit: true }
     ]
   },
   // Finance / Administration
@@ -271,7 +274,8 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
       { module: 'tracker', canView: true, canEdit: false },
       { module: 'code-enforcement', canView: true, canEdit: false },
       { module: 'legislative', canView: true, canEdit: true },
-      { module: 'identity-security', canView: true, canEdit: false }
+      { module: 'identity-security', canView: true, canEdit: false },
+      { module: 'open-records', canView: true, canEdit: true }
     ]
   },
   {
@@ -280,7 +284,8 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
       { module: 'tracker', canView: true, canEdit: true },
       { module: 'code-enforcement', canView: true, canEdit: true },
       { module: 'legislative', canView: true, canEdit: false },
-      { module: 'identity-security', canView: true, canEdit: false }
+      { module: 'identity-security', canView: true, canEdit: false },
+      { module: 'open-records', canView: true, canEdit: true }
     ]
   },
   // IT / Systems

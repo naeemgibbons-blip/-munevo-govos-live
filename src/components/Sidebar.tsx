@@ -54,7 +54,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return 'SE';
   };
 
-  // Base Menu items definition
   const baseMenuItems = [
     { id: 'command-center', name: 'Command Center', icon: ClipboardList, group: 'Personal Workspace' },
     { id: 'tracker', name: 'Universal Tracker', icon: Layers, group: 'Operations' },
@@ -62,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'permits', name: 'Permits & Licensing', icon: FileText, group: 'Departments' },
     { id: 'code-enforcement', name: 'Code Enforcement', icon: ShieldAlert, group: 'Departments' },
     { id: 'legislative', name: 'Legislative Hub', icon: Calendar, group: 'Departments' },
+    { id: 'open-records', name: 'Open Records', icon: FileText, group: 'Departments' },
     { id: 'identity-security', name: 'Identity & Security', icon: ShieldCheck, group: 'Administration' }
   ];
 
