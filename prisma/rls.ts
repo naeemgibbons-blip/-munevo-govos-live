@@ -120,23 +120,63 @@ DROP POLICY IF EXISTS invite_policy ON public."Invite";
 -- SPLIT --
 DROP POLICY IF EXISTS property_policy ON public."Property";
 -- SPLIT --
+DROP POLICY IF EXISTS property_select_policy ON public."Property";
+-- SPLIT --
+DROP POLICY IF EXISTS property_modify_policy ON public."Property";
+-- SPLIT --
 DROP POLICY IF EXISTS business_policy ON public."Business";
+-- SPLIT --
+DROP POLICY IF EXISTS business_select_policy ON public."Business";
+-- SPLIT --
+DROP POLICY IF EXISTS business_modify_policy ON public."Business";
 -- SPLIT --
 DROP POLICY IF EXISTS project_policy ON public."Project";
 -- SPLIT --
+DROP POLICY IF EXISTS project_select_policy ON public."Project";
+-- SPLIT --
+DROP POLICY IF EXISTS project_modify_policy ON public."Project";
+-- SPLIT --
 DROP POLICY IF EXISTS permit_policy ON public."Permit";
+-- SPLIT --
+DROP POLICY IF EXISTS permit_select_policy ON public."Permit";
+-- SPLIT --
+DROP POLICY IF EXISTS permit_modify_policy ON public."Permit";
 -- SPLIT --
 DROP POLICY IF EXISTS inspection_policy ON public."Inspection";
 -- SPLIT --
+DROP POLICY IF EXISTS inspection_select_policy ON public."Inspection";
+-- SPLIT --
+DROP POLICY IF EXISTS inspection_modify_policy ON public."Inspection";
+-- SPLIT --
 DROP POLICY IF EXISTS tracker_policy ON public."TrackerItem";
+-- SPLIT --
+DROP POLICY IF EXISTS tracker_select_policy ON public."TrackerItem";
+-- SPLIT --
+DROP POLICY IF EXISTS tracker_modify_policy ON public."TrackerItem";
 -- SPLIT --
 DROP POLICY IF EXISTS open_records_policy ON public."OpenRecordsRequest";
 -- SPLIT --
+DROP POLICY IF EXISTS open_records_select_policy ON public."OpenRecordsRequest";
+-- SPLIT --
+DROP POLICY IF EXISTS open_records_modify_policy ON public."OpenRecordsRequest";
+-- SPLIT --
 DROP POLICY IF EXISTS employee_policy ON public."Employee";
+-- SPLIT --
+DROP POLICY IF EXISTS employee_select_policy ON public."Employee";
+-- SPLIT --
+DROP POLICY IF EXISTS employee_modify_policy ON public."Employee";
 -- SPLIT --
 DROP POLICY IF EXISTS certification_policy ON public."Certification";
 -- SPLIT --
+DROP POLICY IF EXISTS certification_select_policy ON public."Certification";
+-- SPLIT --
+DROP POLICY IF EXISTS certification_modify_policy ON public."Certification";
+-- SPLIT --
 DROP POLICY IF EXISTS timesheet_policy ON public."Timesheet";
+-- SPLIT --
+DROP POLICY IF EXISTS timesheet_select_policy ON public."Timesheet";
+-- SPLIT --
+DROP POLICY IF EXISTS timesheet_modify_policy ON public."Timesheet";
 -- SPLIT --
 DROP POLICY IF EXISTS audit_log_policy ON public."AuditLog";
 -- SPLIT --
@@ -191,162 +231,250 @@ USING (
   "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
 );
 -- SPLIT --
--- 11. Define Property Policies (Linked to 'command-center' or 'tracker' module)
-CREATE POLICY property_policy ON public."Property"
-FOR ALL
+-- 11. Define Property Policies (Select=canView, Modify=canEdit)
+CREATE POLICY property_select_policy ON public."Property"
+FOR SELECT
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('command-center', false)
   )
-  AND public.check_user_permission('command-center', false)
-)
-WITH CHECK (
-  public.check_user_permission('command-center', true)
 );
 -- SPLIT --
--- 12. Define Business Policies (Linked to 'permits' module)
-CREATE POLICY business_policy ON public."Business"
+CREATE POLICY property_modify_policy ON public."Property"
 FOR ALL
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('command-center', true)
   )
-  AND public.check_user_permission('permits', false)
-)
-WITH CHECK (
-  public.check_user_permission('permits', true)
 );
 -- SPLIT --
--- 13. Define Project Policies (Linked to 'permits' module)
-CREATE POLICY project_policy ON public."Project"
-FOR ALL
+-- 12. Define Business Policies (Select=canView, Modify=canEdit)
+CREATE POLICY business_select_policy ON public."Business"
+FOR SELECT
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('permits', false)
   )
-  AND public.check_user_permission('permits', false)
-)
-WITH CHECK (
-  public.check_user_permission('permits', true)
 );
 -- SPLIT --
--- 14. Define Permit Policies (Linked to 'permits' module)
-CREATE POLICY permit_policy ON public."Permit"
+CREATE POLICY business_modify_policy ON public."Business"
 FOR ALL
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('permits', true)
   )
-  AND public.check_user_permission('permits', false)
-)
-WITH CHECK (
-  public.check_user_permission('permits', true)
 );
 -- SPLIT --
--- 15. Define Inspection Policies (Linked to 'code-enforcement' module)
-CREATE POLICY inspection_policy ON public."Inspection"
-FOR ALL
+-- 13. Define Project Policies (Select=canView, Modify=canEdit)
+CREATE POLICY project_select_policy ON public."Project"
+FOR SELECT
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('permits', false)
   )
-  AND public.check_user_permission('code-enforcement', false)
-)
-WITH CHECK (
-  public.check_user_permission('code-enforcement', true)
 );
 -- SPLIT --
--- 16. Define Tracker Policies (Linked to 'tracker' module)
-CREATE POLICY tracker_policy ON public."TrackerItem"
+CREATE POLICY project_modify_policy ON public."Project"
 FOR ALL
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('permits', true)
   )
-  AND public.check_user_permission('tracker', false)
-)
-WITH CHECK (
-  public.check_user_permission('tracker', true)
 );
 -- SPLIT --
--- 17. Define Open Records Policies (Linked to 'open-records' module)
-CREATE POLICY open_records_policy ON public."OpenRecordsRequest"
-FOR ALL
+-- 14. Define Permit Policies (Select=canView, Modify=canEdit)
+CREATE POLICY permit_select_policy ON public."Permit"
+FOR SELECT
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('permits', false)
   )
-  AND public.check_user_permission('open-records', false)
-)
-WITH CHECK (
-  public.check_user_permission('open-records', true)
 );
 -- SPLIT --
--- 18. Define Employee Policies (Linked to 'identity-security' module)
-CREATE POLICY employee_policy ON public."Employee"
+CREATE POLICY permit_modify_policy ON public."Permit"
 FOR ALL
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('permits', true)
   )
-  AND public.check_user_permission('identity-security', false)
-)
-WITH CHECK (
-  public.check_user_permission('identity-security', true)
 );
 -- SPLIT --
--- 19. Define Certification Policies (Linked to 'identity-security' module)
-CREATE POLICY certification_policy ON public."Certification"
+-- 15. Define Inspection Policies (Select=canView, Modify=canEdit)
+CREATE POLICY inspection_select_policy ON public."Inspection"
+FOR SELECT
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('code-enforcement', false)
+  )
+);
+-- SPLIT --
+CREATE POLICY inspection_modify_policy ON public."Inspection"
 FOR ALL
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('code-enforcement', true)
+  )
+);
+-- SPLIT --
+-- 16. Define Tracker Policies (Select=canView, Modify=canEdit)
+CREATE POLICY tracker_select_policy ON public."TrackerItem"
+FOR SELECT
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('tracker', false)
+  )
+);
+-- SPLIT --
+CREATE POLICY tracker_modify_policy ON public."TrackerItem"
+FOR ALL
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('tracker', true)
+  )
+);
+-- SPLIT --
+-- 17. Define Open Records Policies (Select=canView, Modify=canEdit)
+CREATE POLICY open_records_select_policy ON public."OpenRecordsRequest"
+FOR SELECT
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('open-records', false)
+  )
+);
+-- SPLIT --
+CREATE POLICY open_records_modify_policy ON public."OpenRecordsRequest"
+FOR ALL
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('open-records', true)
+  )
+);
+-- SPLIT --
+-- 18. Define Employee Policies (Select=canView, Modify=canEdit)
+CREATE POLICY employee_select_policy ON public."Employee"
+FOR SELECT
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('identity-security', false)
+  )
+);
+-- SPLIT --
+CREATE POLICY employee_modify_policy ON public."Employee"
+FOR ALL
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    AND public.check_user_permission('identity-security', true)
+  )
+);
+-- SPLIT --
+-- 19. Define Certification Policies (Select=canView, Modify=canEdit)
+CREATE POLICY certification_select_policy ON public."Certification"
+FOR SELECT
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
     EXISTS (
       SELECT 1 FROM public."Employee" e
       WHERE e.id = "employeeId"
       AND e."organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
     )
+    AND public.check_user_permission('identity-security', false)
   )
-  AND public.check_user_permission('identity-security', false)
-)
-WITH CHECK (
-  public.check_user_permission('identity-security', true)
 );
 -- SPLIT --
--- 20. Define Timesheet Policies (Linked to 'identity-security' module)
-CREATE POLICY timesheet_policy ON public."Timesheet"
+CREATE POLICY certification_modify_policy ON public."Certification"
 FOR ALL
 USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
   (
-    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
-    OR
     EXISTS (
       SELECT 1 FROM public."Employee" e
       WHERE e.id = "employeeId"
       AND e."organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
     )
+    AND public.check_user_permission('identity-security', true)
   )
-  AND public.check_user_permission('identity-security', false)
-)
-WITH CHECK (
-  public.check_user_permission('identity-security', true)
+);
+-- SPLIT --
+-- 20. Define Timesheet Policies (Select=canView, Modify=canEdit)
+CREATE POLICY timesheet_select_policy ON public."Timesheet"
+FOR SELECT
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    EXISTS (
+      SELECT 1 FROM public."Employee" e
+      WHERE e.id = "employeeId"
+      AND e."organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    )
+    AND public.check_user_permission('identity-security', false)
+  )
+);
+-- SPLIT --
+CREATE POLICY timesheet_modify_policy ON public."Timesheet"
+FOR ALL
+USING (
+  (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+  OR
+  (
+    EXISTS (
+      SELECT 1 FROM public."Employee" e
+      WHERE e.id = "employeeId"
+      AND e."organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    )
+    AND public.check_user_permission('identity-security', true)
+  )
 );
 -- SPLIT --
 -- 21. Define AuditLog Policies (Write/Read linked to identity-security view checks)
@@ -361,13 +489,12 @@ USING (
   AND public.check_user_permission('identity-security', false)
 )
 WITH CHECK (
-  -- System/Server can write audit logs
   true
 );
 `;
 
 async function main() {
-  console.log("Applying Supabase auth trigger & custom RBAC RLS policies...");
+  console.log("Applying Supabase auth trigger & split custom RBAC RLS policies...");
   
   const statements = sql
     .split('-- SPLIT --')
@@ -384,7 +511,7 @@ async function main() {
     }
   }
 
-  console.log("Supabase custom RBAC RLS policies successfully applied to the database!");
+  console.log("Supabase split custom RBAC RLS policies successfully applied to the database!");
 }
 
 main()

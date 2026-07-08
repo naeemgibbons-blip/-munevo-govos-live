@@ -55,13 +55,23 @@ function App() {
   // Operations Data States
   const [properties, setProperties] = useState<Record<string, any>>(PROPERTIES);
   const [trackerItems, setTrackerItemsRaw] = useState<TrackerItem[]>(TRACKER_ITEMS);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // Fetch Organizations on boot
   useEffect(() => {
     fetch(`${API_URL}/api/organizations`)
-      .then(res => res.json())
-      .then(data => setOrganizations(data))
-      .catch(err => console.error('Failed to load organizations directory:', err));
+      .then(res => {
+        if (!res.ok) throw new Error('API server returned error status');
+        return res.json();
+      })
+      .then(data => {
+        setOrganizations(data);
+        setConnectionError(null);
+      })
+      .catch(err => {
+        console.error('Failed to load organizations directory:', err);
+        setConnectionError('Munevo DB API Server is currently offline. Please run "npm run dev" or check port 3001.');
+      });
   }, []);
 
   const currentOrg = organizations.find(o => o.slug === tenant);
@@ -125,20 +135,34 @@ function App() {
     fetch(`${API_URL}/api/properties`, {
       headers: { 'x-organization-id': currentOrgId }
     })
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) throw new Error('API server returned error status');
+      return res.json();
+    })
     .then(data => {
       setProperties(data);
+      setConnectionError(null);
     })
-    .catch(err => console.error('Failed to load isolated property records:', err));
+    .catch(err => {
+      console.error('Failed to load isolated property records:', err);
+      setConnectionError('Munevo DB API Server is currently offline. Please run "npm run dev" or check port 3001.');
+    });
 
     fetch(`${API_URL}/api/tracker`, {
       headers: { 'x-organization-id': currentOrgId }
     })
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) throw new Error('API server returned error status');
+      return res.json();
+    })
     .then(data => {
       setTrackerItemsRaw(data);
+      setConnectionError(null);
     })
-    .catch(err => console.error('Failed to load isolated tracker records:', err));
+    .catch(err => {
+      console.error('Failed to load isolated tracker records:', err);
+      setConnectionError('Munevo DB API Server is currently offline. Please run "npm run dev" or check port 3001.');
+    });
   }, [currentOrgId]);
 
   // Evaluate module write permission dynamically
@@ -453,6 +477,15 @@ function App() {
 
         <div className="workspace-canvas">
           <div className="pane-left">
+            {connectionError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', color: 'var(--danger-text)', margin: '16px 24px 8px 24px' }}>
+                <AlertCircle size={16} />
+                <div>
+                  <strong style={{ display: 'block', fontSize: '13px', color: '#fff' }}>API Server Connection Loss</strong>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>{connectionError}</span>
+                </div>
+              </div>
+            )}
             {viewMode === 'module' ? (
               <>
                 {activeModule === 'command-center' && (

@@ -802,26 +802,5 @@ export const LEGISLATIVE_ITEMS: LegislativeItem[] = [
   }
 ];
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env) ? (import.meta.env.VITE_API_URL || 'http://localhost:3001') : 'http://localhost:3001';
-
-let fetchedProperties = MOCK_PROPERTIES;
-let fetchedTracker = MOCK_TRACKER_ITEMS;
-
-try {
-  const resProps = await fetch(`${API_URL}/api/properties`);
-  fetchedProperties = await resProps.json();
-  console.log("Munevo DB Sync: Properties successfully loaded from Supabase PostgreSQL!");
-} catch (e) {
-  console.log("Munevo DB Sync: Offline. Using local mock fallback for properties.");
-}
-
-try {
-  const resTracker = await fetch(`${API_URL}/api/tracker`);
-  fetchedTracker = await resTracker.json();
-  console.log("Munevo DB Sync: Universal Tracker successfully loaded from Supabase PostgreSQL!");
-} catch (e) {
-  console.log("Munevo DB Sync: Offline. Using local mock fallback for operations tracker.");
-}
-
-export const PROPERTIES = fetchedProperties;
-export const TRACKER_ITEMS = fetchedTracker;
+export const PROPERTIES = MOCK_PROPERTIES;
+export const TRACKER_ITEMS = MOCK_TRACKER_ITEMS;

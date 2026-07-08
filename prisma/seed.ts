@@ -414,6 +414,31 @@ async function main() {
     ]
   });
 
+  console.log('Seeding Open Records requests...');
+  await prisma.openRecordsRequest.deleteMany();
+  await prisma.openRecordsRequest.createMany({
+    data: [
+      {
+        organizationId: newark.id,
+        requesterName: 'John Miller (Newark Ledger)',
+        requesterEmail: 'j.miller@newarkledger.com',
+        description: 'Copy of council voting sheets and final Redevelopment Agreement signed with DCF Developers, LLC for Market Street Enclaves on June 18, 2026.',
+        dateRange: 'June 2026',
+        status: 'Fulfilled',
+        assignedTo: 'City Clerk'
+      },
+      {
+        organizationId: newark.id,
+        requesterName: 'Sarah Thompson',
+        requesterEmail: 'sthompson@ironboundcoalition.org',
+        description: 'Water lead content test reports conducted at local school facilities in the Ironbound district between January 1, 2026 and June 30, 2026.',
+        dateRange: 'Jan 2026 - Jun 2026',
+        status: 'Under Review',
+        assignedTo: 'Water Dept Lead'
+      }
+    ]
+  });
+
   console.log('Seeding completed successfully!');
 }
 

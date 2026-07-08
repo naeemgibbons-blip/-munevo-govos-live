@@ -281,9 +281,27 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item) => {
-                const isSelected = selectedItemId === item.id;
-                const isCritical = item.priority === 'Critical';
+              {filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '60px 40px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', color: 'var(--text-muted)' }}>
+                      <Layers size={40} style={{ color: 'var(--primary-color)', opacity: 0.5 }} />
+                      <div>
+                        <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 4px 0', color: '#fff' }}>No Operations Tickets Found</h3>
+                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>There are no active operational records matching these filters.</p>
+                      </div>
+                      {canEdit && (
+                        <button className="ai-btn-send" onClick={() => setShowAddModal(true)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', marginTop: '6px' }}>
+                          Create Ticket
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredItems.map((item) => {
+                  const isSelected = selectedItemId === item.id;
+                  const isCritical = item.priority === 'Critical';
                 const isHigh = item.priority === 'High';
                 
                 let progressColorClass = '';
@@ -353,7 +371,7 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

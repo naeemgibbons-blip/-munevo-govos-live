@@ -288,8 +288,26 @@ export const EmployeeRoster: React.FC<EmployeeRosterProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredEmployees.map(emp => {
-                const isExpanded = expandedEmployeeId === emp.id;
+              {filteredEmployees.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '60px 40px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', color: 'var(--text-muted)' }}>
+                      <Users size={40} style={{ color: 'var(--primary-color)', opacity: 0.5 }} />
+                      <div>
+                        <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 4px 0', color: '#fff' }}>No Staff Registered</h3>
+                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>There are no staff members on file matching these criteria.</p>
+                      </div>
+                      {canEdit && (
+                        <button className="ai-btn-send" onClick={() => setShowAddModal(true)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', marginTop: '6px' }}>
+                          Add Staff Member
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredEmployees.map(emp => {
+                  const isExpanded = expandedEmployeeId === emp.id;
                 const soonExpiringCount = emp.certifications.filter(c => checkExpiringSoon(c.expiresAt)).length;
                 return (
                   <React.Fragment key={emp.id}>
@@ -407,7 +425,7 @@ export const EmployeeRoster: React.FC<EmployeeRosterProps> = ({
                     )}
                   </React.Fragment>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

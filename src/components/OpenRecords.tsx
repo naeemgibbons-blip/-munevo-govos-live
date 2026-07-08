@@ -244,8 +244,12 @@ export const OpenRecords: React.FC<OpenRecordsProps> = ({
           <div className="glass-card" style={{ padding: '0', display: 'flex', flexDirection: 'column' }}>
             <div className="list-queue" style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', maxHeight: '450px' }}>
               {filteredRequests.length === 0 ? (
-                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                  No records requests found.
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: '12px', textAlign: 'center' }}>
+                  <FileText size={40} style={{ color: 'var(--primary-color)', opacity: 0.5 }} />
+                  <div>
+                    <h4 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 2px 0', color: '#fff' }}>No Records Requests Logged</h4>
+                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>This municipality has no public record request records on file.</p>
+                  </div>
                 </div>
               ) : (
                 filteredRequests.map(req => {
