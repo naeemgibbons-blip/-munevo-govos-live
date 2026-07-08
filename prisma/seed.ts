@@ -307,6 +307,113 @@ async function main() {
     }
   });
 
+  console.log('Seeding Newark Staff directory (Employees & Certifications)...');
+  await prisma.timesheet.deleteMany();
+  await prisma.certification.deleteMany();
+  await prisma.employee.deleteMany();
+  await prisma.auditLog.deleteMany();
+
+  const empElena = await prisma.employee.create({
+    data: {
+      organizationId: newark.id,
+      firstName: 'Elena',
+      lastName: 'Rostova',
+      email: 'elena.rostova@newark.gov',
+      department: 'Code Enforcement',
+      hireDate: new Date('2023-03-15')
+    }
+  });
+
+  const empMarcus = await prisma.employee.create({
+    data: {
+      organizationId: newark.id,
+      firstName: 'Marcus',
+      lastName: 'Miller',
+      email: 'marcus.miller@newark.gov',
+      department: 'Public Works',
+      hireDate: new Date('2022-06-10')
+    }
+  });
+
+  const empBob = await prisma.employee.create({
+    data: {
+      organizationId: newark.id,
+      firstName: 'Bob',
+      lastName: 'Carter',
+      email: 'bob.carter@newark.gov',
+      department: 'Legal & Compliance',
+      hireDate: new Date('2024-01-10')
+    }
+  });
+
+  await prisma.certification.createMany({
+    data: [
+      {
+        employeeId: empElena.id,
+        name: 'Structural Building Inspector Level II',
+        credentialId: 'CERT-STR-2025-09',
+        issuedDate: new Date('2025-09-15'),
+        expiresAt: new Date('2026-12-15')
+      },
+      {
+        employeeId: empElena.id,
+        name: 'Zoning Board Review Certification',
+        credentialId: 'CERT-ZON-2024-11',
+        issuedDate: new Date('2024-11-20'),
+        expiresAt: new Date('2026-08-30') // Soon expiring!
+      },
+      {
+        employeeId: empMarcus.id,
+        name: 'Municipal Lead Water Technician',
+        credentialId: 'CERT-WAT-2023-04',
+        issuedDate: new Date('2023-04-01'),
+        expiresAt: new Date('2027-04-01')
+      }
+    ]
+  });
+
+  await prisma.timesheet.createMany({
+    data: [
+      { employeeId: empElena.id, date: new Date('2026-07-06'), hoursWorked: 8.0, notes: 'Completed structural reviews on Washington St' },
+      { employeeId: empElena.id, date: new Date('2026-07-07'), hoursWorked: 8.5, notes: 'Code violations audits' },
+      { employeeId: empMarcus.id, date: new Date('2026-07-06'), hoursWorked: 8.0, notes: 'Water pressure sensor inspections' },
+      { employeeId: empMarcus.id, date: new Date('2026-07-07'), hoursWorked: 7.5, notes: 'Main line flush' }
+    ]
+  });
+
+  console.log('Seeding initial Audit Logs...');
+  await prisma.auditLog.createMany({
+    data: [
+      {
+        organizationId: newark.id,
+        userId: 'simulated-user-global_admin',
+        userEmail: 'global_admin@munevo.gov',
+        action: 'CREATE',
+        tableName: 'Organization',
+        recordId: newark.id,
+        newValues: { name: 'City of Newark', slug: 'newark' }
+      },
+      {
+        organizationId: newark.id,
+        userId: 'simulated-user-mayor',
+        userEmail: 'mayor@munevo.gov',
+        action: 'UPDATE',
+        tableName: 'CustomRole',
+        recordId: 'role-water-lead',
+        newValues: { name: 'Water Dept Lead', module: 'tracker', canEdit: true }
+      },
+      {
+        organizationId: newark.id,
+        userId: 'simulated-user-inspector',
+        userEmail: 'inspector@munevo.gov',
+        action: 'APPROVE',
+        tableName: 'Permit',
+        recordId: 'BP-2026-0145',
+        newValues: { status: 'Approved' }
+      }
+    ]
+  });
+
   console.log('Seeding completed successfully!');
 }
 

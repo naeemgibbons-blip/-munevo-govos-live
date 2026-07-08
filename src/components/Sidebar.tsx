@@ -11,7 +11,8 @@ import {
   Database,
   ArrowRightLeft,
   ShieldCheck,
-  Shield
+  Shield,
+  Users
 } from 'lucide-react';
 import { UserRole } from '../mockData';
 
@@ -62,6 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'code-enforcement', name: 'Code Enforcement', icon: ShieldAlert, group: 'Departments' },
     { id: 'legislative', name: 'Legislative Hub', icon: Calendar, group: 'Departments' },
     { id: 'open-records', name: 'Open Records', icon: FileText, group: 'Departments' },
+    { id: 'employee-roster', name: 'Staff Directory', icon: Users, group: 'Administration' },
+    { id: 'system-audit', name: 'System Audit Trail', icon: Database, group: 'Administration' },
     { id: 'identity-security', name: 'Identity & Security', icon: ShieldCheck, group: 'Administration' }
   ];
 

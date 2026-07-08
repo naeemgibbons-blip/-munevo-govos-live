@@ -26,6 +26,8 @@ model Organization {
   trackerItems        TrackerItem[]
   invites             Invite[]
   openRecordsRequests OpenRecordsRequest[]
+  employees           Employee[]
+  auditLogs           AuditLog[]
 }
 
 // 2. Custom Role System (Isolated Per Org)
@@ -49,7 +51,7 @@ model Permission {
   id             String        @id @default(uuid())
   roleId         String
   role           CustomRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  module         String        // "command-center" | "tracker" | "gis" | "permits" | "code-enforcement" | "legislative" | "open-records"
+  module         String        // "command-center" | "tracker" | "gis" | "permits" | "code-enforcement" | "legislative" | "open-records" | "staff-audit"
   canView        Boolean       @default(false)
   canEdit        Boolean       @default(false)
   createdAt      DateTime      @default(now())
@@ -76,6 +78,7 @@ model Profile {
   
   createdAt      DateTime      @default(now())
   sentInvites    Invite[]      @relation("InvitedBy")
+  employee       Employee?
 }
 
 // 5. Invitations Flow (Invite-Only)
@@ -179,7 +182,7 @@ model TrackerItem {
   property       Property       @relation(fields: [propertyId], references: [id])
 }
 
-// 6. NEW MODEL: Open Records (FOIA-style Requests)
+// 6. Open Records (FOIA-style Requests)
 model OpenRecordsRequest {
   id             String       @id @default(uuid())
   organizationId String
@@ -193,4 +196,60 @@ model OpenRecordsRequest {
   assignedTo     String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+// 7. NEW MODEL: Employee (Staff Directory)
+model Employee {
+  id             String          @id @default(uuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  profileId      String?         @unique
+  profile        Profile?        @relation(fields: [profileId], references: [id])
+  
+  firstName      String
+  lastName       String
+  email          String
+  department     String          // "Code Enforcement" | "Public Works" | "City Clerk" etc.
+  hireDate       DateTime
+  
+  // Relations
+  certifications Certification[]
+  timesheets     Timesheet[]
+}
+
+// 8. NEW MODEL: Staff Certifications
+model Certification {
+  id             String       @id @default(uuid())
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name           String       // e.g. "Structural Building Inspector Level II"
+  credentialId   String
+  issuedDate     DateTime
+  expiresAt      DateTime
+  alertSent      Boolean      @default(false)
+}
+
+// 9. NEW MODEL: Simple Timesheet Tracker
+model Timesheet {
+  id             String       @id @default(uuid())
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date           DateTime
+  hoursWorked    Float
+  notes          String?
+}
+
+// 10. NEW MODEL: System-wide Audit Ledger
+model AuditLog {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?      
+  userEmail      String?
+  action         String       // "CREATE" | "UPDATE" | "DELETE" | "APPROVE"
+  tableName      String       
+  recordId       String       
+  oldValues      Json?
+  newValues      Json?
+  createdAt      DateTime     @default(now())
 }

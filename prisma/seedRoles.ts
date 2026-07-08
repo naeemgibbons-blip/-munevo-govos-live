@@ -26,7 +26,9 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
       { module: 'code-enforcement', canView: true, canEdit: false },
       { module: 'legislative', canView: true, canEdit: true },
       { module: 'identity-security', canView: true, canEdit: false },
-      { module: 'open-records', canView: true, canEdit: false }
+      { module: 'open-records', canView: true, canEdit: false },
+      { module: 'employee-roster', canView: true, canEdit: false },
+      { module: 'system-audit', canView: true, canEdit: false }
     ]
   },
   {
@@ -39,7 +41,9 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
       { module: 'code-enforcement', canView: true, canEdit: false },
       { module: 'legislative', canView: true, canEdit: false },
       { module: 'identity-security', canView: true, canEdit: false },
-      { module: 'open-records', canView: true, canEdit: false }
+      { module: 'open-records', canView: true, canEdit: false },
+      { module: 'employee-roster', canView: true, canEdit: false },
+      { module: 'system-audit', canView: true, canEdit: false }
     ]
   },
   {
@@ -264,7 +268,8 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
   {
     name: 'HR / Personnel Manager',
     permissions: [
-      { module: 'identity-security', canView: true, canEdit: true }
+      { module: 'identity-security', canView: true, canEdit: true },
+      { module: 'employee-roster', canView: true, canEdit: true }
     ]
   },
   // Legal / Compliance
@@ -275,7 +280,9 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
       { module: 'code-enforcement', canView: true, canEdit: false },
       { module: 'legislative', canView: true, canEdit: true },
       { module: 'identity-security', canView: true, canEdit: false },
-      { module: 'open-records', canView: true, canEdit: true }
+      { module: 'open-records', canView: true, canEdit: true },
+      { module: 'employee-roster', canView: true, canEdit: false },
+      { module: 'system-audit', canView: true, canEdit: false }
     ]
   },
   {
@@ -285,7 +292,9 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
       { module: 'code-enforcement', canView: true, canEdit: true },
       { module: 'legislative', canView: true, canEdit: false },
       { module: 'identity-security', canView: true, canEdit: false },
-      { module: 'open-records', canView: true, canEdit: true }
+      { module: 'open-records', canView: true, canEdit: true },
+      { module: 'employee-roster', canView: true, canEdit: false },
+      { module: 'system-audit', canView: true, canEdit: true }
     ]
   },
   // IT / Systems
@@ -294,7 +303,9 @@ export const MUNICIPAL_ROLES_TEMPLATE: RoleTemplate[] = [
     permissions: [
       { module: 'identity-security', canView: true, canEdit: true },
       { module: 'org-admin', canView: true, canEdit: true },
-      { module: 'gis', canView: true, canEdit: true }
+      { module: 'gis', canView: true, canEdit: true },
+      { module: 'employee-roster', canView: true, canEdit: true },
+      { module: 'system-audit', canView: true, canEdit: true }
     ]
   },
   {

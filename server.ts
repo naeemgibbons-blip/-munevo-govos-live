@@ -23,6 +23,35 @@ async function getNewarkOrgId() {
   return newark?.id || '';
 }
 
+// Helper: Automatically record actions in Audit Log
+async function recordAudit(
+  orgId: string, 
+  userId: string | null, 
+  email: string | null, 
+  action: string, 
+  tableName: string, 
+  recordId: string, 
+  oldValues: any = null, 
+  newValues: any = null
+) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        organizationId: orgId,
+        userId: userId || 'simulated-system-user',
+        userEmail: email || 'system@munevo.gov',
+        action,
+        tableName,
+        recordId,
+        oldValues,
+        newValues
+      }
+    });
+  } catch (err) {
+    console.error('Failed to log audit event:', err);
+  }
+}
+
 // 1. GET: Fetch all properties (filtered by organization)
 app.get('/api/properties', async (req, res) => {
   try {
@@ -144,6 +173,8 @@ app.post('/api/tracker', async (req, res) => {
   try {
     const { module, title, status, priority, assignedTo, slaDays, address } = req.body;
     let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    const userId = req.headers['x-user-id'] as string;
+    const userEmail = req.headers['x-user-email'] as string;
     
     if (!orgId) {
       orgId = await getNewarkOrgId();
@@ -187,6 +218,9 @@ app.post('/api/tracker', async (req, res) => {
       }
     });
 
+    // Record in AuditLog
+    await recordAudit(orgId, userId, userEmail, 'CREATE', 'TrackerItem', newItem.id, null, newItem);
+
     const formatted = {
       id: newItem.id,
       module: newItem.module,
@@ -219,6 +253,15 @@ app.put('/api/tracker/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { status, priority, assignedTo } = req.body;
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    const userId = req.headers['x-user-id'] as string;
+    const userEmail = req.headers['x-user-email'] as string;
+
+    if (!orgId) {
+      orgId = await getNewarkOrgId();
+    }
+
+    const oldItem = await prisma.trackerItem.findUnique({ where: { id } });
 
     const updatedItem = await prisma.trackerItem.update({
       where: { id },
@@ -231,6 +274,9 @@ app.put('/api/tracker/:id', async (req, res) => {
         property: true
       }
     });
+
+    // Record in AuditLog
+    await recordAudit(orgId, userId, userEmail, 'UPDATE', 'TrackerItem', id, oldItem, updatedItem);
 
     const formatted = {
       id: updatedItem.id,
@@ -407,6 +453,8 @@ app.get('/api/custom-roles', async (req, res) => {
 app.post('/api/custom-roles', async (req, res) => {
   const { name, permissions } = req.body;
   const orgId = req.headers['x-organization-id'] as string;
+  const userId = req.headers['x-user-id'] as string;
+  const userEmail = req.headers['x-user-email'] as string;
   
   if (!orgId) {
     return res.status(400).json({ error: 'x-organization-id header is required' });
@@ -436,6 +484,9 @@ app.post('/api/custom-roles', async (req, res) => {
       where: { id: newRole.id },
       include: { permissions: true }
     });
+
+    // Record in AuditLog
+    await recordAudit(orgId, userId, userEmail, 'CREATE', 'CustomRole', newRole.id, null, roleWithPermissions);
     
     res.status(201).json(roleWithPermissions);
   } catch (err: any) {
@@ -447,8 +498,17 @@ app.post('/api/custom-roles', async (req, res) => {
 app.put('/api/custom-roles/:id/permissions', async (req, res) => {
   const { id } = req.params;
   const { permissions } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  const userId = req.headers['x-user-id'] as string;
+  const userEmail = req.headers['x-user-email'] as string;
+
+  if (!orgId) {
+    orgId = await getNewarkOrgId();
+  }
   
   try {
+    const oldRole = await prisma.customRole.findUnique({ where: { id }, include: { permissions: true } });
+
     await prisma.permission.deleteMany({
       where: { roleId: id }
     });
@@ -469,6 +529,9 @@ app.put('/api/custom-roles/:id/permissions', async (req, res) => {
       where: { id },
       include: { permissions: true }
     });
+
+    // Record in AuditLog
+    await recordAudit(orgId, userId, userEmail, 'UPDATE', 'CustomRole', id, oldRole, updatedRole);
     
     res.json(updatedRole);
   } catch (err: any) {
@@ -562,6 +625,8 @@ app.post('/api/open-records', async (req, res) => {
   try {
     const { requesterName, requesterEmail, description, dateRange, status, assignedTo } = req.body;
     let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    const userId = req.headers['x-user-id'] as string;
+    const userEmail = req.headers['x-user-email'] as string;
     
     if (!orgId) {
       orgId = await getNewarkOrgId();
@@ -579,6 +644,9 @@ app.post('/api/open-records', async (req, res) => {
       }
     });
 
+    // Record in AuditLog
+    await recordAudit(orgId, userId, userEmail, 'CREATE', 'OpenRecordsRequest', newRequest.id, null, newRequest);
+
     res.status(201).json(newRequest);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -590,15 +658,124 @@ app.put('/api/open-records/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { status, assignedTo } = req.body;
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    const userId = req.headers['x-user-id'] as string;
+    const userEmail = req.headers['x-user-email'] as string;
+
+    if (!orgId) {
+      orgId = await getNewarkOrgId();
+    }
+
+    const oldRequest = await prisma.openRecordsRequest.findUnique({ where: { id } });
 
     const updated = await prisma.openRecordsRequest.update({
       where: { id },
       data: { status, assignedTo }
     });
 
+    // Record in AuditLog
+    await recordAudit(orgId, userId, userEmail, 'UPDATE', 'OpenRecordsRequest', id, oldRequest, updated);
+
     res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 18. GET: Fetch Newark staff roster (employees directory)
+app.get('/api/employees', async (req, res) => {
+  try {
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    if (!orgId) orgId = await getNewarkOrgId();
+
+    const employees = await prisma.employee.findMany({
+      where: { organizationId: orgId },
+      include: {
+        certifications: true,
+        timesheets: {
+          orderBy: { date: 'desc' }
+        }
+      }
+    });
+    res.json(employees);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 19. POST: Register a new employee
+app.post('/api/employees', async (req, res) => {
+  try {
+    const { firstName, lastName, email, department, hireDate } = req.body;
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    const userId = req.headers['x-user-id'] as string;
+    const userEmail = req.headers['x-user-email'] as string;
+
+    if (!orgId) orgId = await getNewarkOrgId();
+
+    const emp = await prisma.employee.create({
+      data: {
+        organizationId: orgId,
+        firstName,
+        lastName,
+        email,
+        department,
+        hireDate: new Date(hireDate || Date.now())
+      }
+    });
+
+    // Record in AuditLog
+    await recordAudit(orgId, userId, userEmail, 'CREATE', 'Employee', emp.id, null, emp);
+
+    res.status(201).json(emp);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 20. POST: Add hours to an employee timesheet
+app.post('/api/employees/:id/timesheets', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, hoursWorked, notes } = req.body;
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    const userId = req.headers['x-user-id'] as string;
+    const userEmail = req.headers['x-user-email'] as string;
+
+    if (!orgId) orgId = await getNewarkOrgId();
+
+    const ts = await prisma.timesheet.create({
+      data: {
+        employeeId: id,
+        date: new Date(date),
+        hoursWorked: parseFloat(hoursWorked),
+        notes
+      }
+    });
+
+    // Record in AuditLog
+    await recordAudit(orgId, userId, userEmail, 'CREATE', 'Timesheet', ts.id, null, ts);
+
+    res.status(201).json(ts);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 21. GET: Fetch system audit trail log
+app.get('/api/audit-logs', async (req, res) => {
+  try {
+    let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+    if (!orgId) orgId = await getNewarkOrgId();
+
+    const logs = await prisma.auditLog.findMany({
+      where: { organizationId: orgId },
+      orderBy: { createdAt: 'desc' },
+      take: 100 // cap at 100 recent rows
+    });
+    res.json(logs);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

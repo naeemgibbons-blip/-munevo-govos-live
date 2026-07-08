@@ -10,6 +10,8 @@ import { IdentityConsole } from './components/IdentityConsole';
 import { GlobalAdminConsole } from './components/GlobalAdminConsole';
 import { OrgAdminConsole } from './components/OrgAdminConsole';
 import { OpenRecords } from './components/OpenRecords';
+import { EmployeeRoster } from './components/EmployeeRoster';
+import { AuditTrail } from './components/AuditTrail';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -169,7 +171,9 @@ function App() {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'x-organization-id': currentOrgId 
+            'x-organization-id': currentOrgId,
+            'x-user-id': currentProfile?.id || '',
+            'x-user-email': currentProfile?.email || ''
           },
           body: JSON.stringify({
             module: newItem.module,
@@ -200,7 +204,9 @@ function App() {
                 method: 'PUT',
                 headers: { 
                   'Content-Type': 'application/json',
-                  'x-organization-id': currentOrgId 
+                  'x-organization-id': currentOrgId,
+                  'x-user-id': currentProfile?.id || '',
+                  'x-user-email': currentProfile?.email || ''
                 },
                 body: JSON.stringify({
                   status: newItem.status,
@@ -582,6 +588,21 @@ function App() {
                     currentProfile={currentProfile}
                     addNotification={addNotification}
                     canEdit={canEditModule('open-records')}
+                  />
+                )}
+
+                {activeModule === 'employee-roster' && (
+                  <EmployeeRoster 
+                    currentProfile={currentProfile}
+                    addNotification={addNotification}
+                    canEdit={canEditModule('employee-roster')}
+                  />
+                )}
+
+                {activeModule === 'system-audit' && (
+                  <AuditTrail 
+                    currentProfile={currentProfile}
+                    addNotification={addNotification}
                   />
                 )}
               </>

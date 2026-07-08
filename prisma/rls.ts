@@ -99,6 +99,14 @@ ALTER TABLE public."TrackerItem" ENABLE ROW LEVEL SECURITY;
 -- SPLIT --
 ALTER TABLE public."OpenRecordsRequest" ENABLE ROW LEVEL SECURITY;
 -- SPLIT --
+ALTER TABLE public."Employee" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
+ALTER TABLE public."Certification" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
+ALTER TABLE public."Timesheet" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
+ALTER TABLE public."AuditLog" ENABLE ROW LEVEL SECURITY;
+-- SPLIT --
 -- 5. Drop existing policies to prevent conflicts on execution rerun
 DROP POLICY IF EXISTS organization_policy ON public."Organization";
 -- SPLIT --
@@ -123,6 +131,14 @@ DROP POLICY IF EXISTS inspection_policy ON public."Inspection";
 DROP POLICY IF EXISTS tracker_policy ON public."TrackerItem";
 -- SPLIT --
 DROP POLICY IF EXISTS open_records_policy ON public."OpenRecordsRequest";
+-- SPLIT --
+DROP POLICY IF EXISTS employee_policy ON public."Employee";
+-- SPLIT --
+DROP POLICY IF EXISTS certification_policy ON public."Certification";
+-- SPLIT --
+DROP POLICY IF EXISTS timesheet_policy ON public."Timesheet";
+-- SPLIT --
+DROP POLICY IF EXISTS audit_log_policy ON public."AuditLog";
 -- SPLIT --
 -- 6. Define Organization Policies
 CREATE POLICY organization_policy ON public."Organization"
@@ -278,6 +294,75 @@ USING (
 )
 WITH CHECK (
   public.check_user_permission('open-records', true)
+);
+-- SPLIT --
+-- 18. Define Employee Policies (Linked to 'identity-security' module)
+CREATE POLICY employee_policy ON public."Employee"
+FOR ALL
+USING (
+  (
+    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+    OR
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+  )
+  AND public.check_user_permission('identity-security', false)
+)
+WITH CHECK (
+  public.check_user_permission('identity-security', true)
+);
+-- SPLIT --
+-- 19. Define Certification Policies (Linked to 'identity-security' module)
+CREATE POLICY certification_policy ON public."Certification"
+FOR ALL
+USING (
+  (
+    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+    OR
+    EXISTS (
+      SELECT 1 FROM public."Employee" e
+      WHERE e.id = "employeeId"
+      AND e."organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    )
+  )
+  AND public.check_user_permission('identity-security', false)
+)
+WITH CHECK (
+  public.check_user_permission('identity-security', true)
+);
+-- SPLIT --
+-- 20. Define Timesheet Policies (Linked to 'identity-security' module)
+CREATE POLICY timesheet_policy ON public."Timesheet"
+FOR ALL
+USING (
+  (
+    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+    OR
+    EXISTS (
+      SELECT 1 FROM public."Employee" e
+      WHERE e.id = "employeeId"
+      AND e."organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+    )
+  )
+  AND public.check_user_permission('identity-security', false)
+)
+WITH CHECK (
+  public.check_user_permission('identity-security', true)
+);
+-- SPLIT --
+-- 21. Define AuditLog Policies (Write/Read linked to identity-security view checks)
+CREATE POLICY audit_log_policy ON public."AuditLog"
+FOR ALL
+USING (
+  (
+    (SELECT "isGlobalAdmin" FROM public."Profile" WHERE id = auth.uid()::text) = true
+    OR
+    "organizationId"::text = (SELECT "organizationId" FROM public."Profile" WHERE id = auth.uid()::text)
+  )
+  AND public.check_user_permission('identity-security', false)
+)
+WITH CHECK (
+  -- System/Server can write audit logs
+  true
 );
 `;
 
