@@ -12,6 +12,7 @@ import {
   Lock,
   Loader2
 } from 'lucide-react';
+import { supabase, hasRealSupabase } from '../supabaseClient';
 
 interface MarketingLandingProps {
   onLoginDemo: (demoProfile: any) => void;
@@ -33,6 +34,62 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
   const [email, setEmail] = useState('');
   const [municipality, setMunicipality] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Staff Login Form States
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const handleStaffLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword
+      });
+
+      if (error) {
+        addNotification(`Auth Error: ${error.message}`);
+        // Check if user is logging in with global admin email and keys are dummy
+        if (!hasRealSupabase && loginEmail === 'global_admin@munevo.gov') {
+          addNotification('Local Dev Sync: Real credentials registry match simulated bypass.');
+          // Simulate Global Admin bypass locally for ease of client onboarding wizard tests
+          const res = await fetch(`${API_URL}/api/profiles/me`, {
+            headers: {
+              'x-user-email': loginEmail
+            }
+          });
+          if (res.ok) {
+            const profile = await res.json();
+            onLoginDemo(profile);
+            setShowLoginForm(false);
+          }
+        }
+      } else if (data.user) {
+        addNotification('Authentication Successful. Resolving registry record...');
+        const res = await fetch(`${API_URL}/api/profiles/me`, {
+          headers: {
+            'x-user-id': data.user.id,
+            'x-user-email': data.user.email || ''
+          }
+        });
+        if (res.ok) {
+          const profile = await res.json();
+          onLoginDemo(profile);
+          setShowLoginForm(false);
+        } else {
+          addNotification('Database Registry Loss: Profile record not configured.');
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      addNotification(`API Error: ${err.message || 'Failed connecting to database registry auth.'}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const handleLaunchSandbox = async () => {
     setDemoLoading(true);
@@ -84,7 +141,7 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
           <button 
-            onClick={onEnterApp}
+            onClick={() => setShowLoginForm(true)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 0, color: 'var(--text-secondary)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}
           >
             <Lock size={14} />
@@ -304,6 +361,72 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
               >
                 <Send size={14} />
                 <span>Submit Query</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Staff Login Modal Overlay */}
+      {showLoginForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <form 
+            onSubmit={handleStaffLogin} 
+            style={{ background: '#11131c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '32px', width: '100%', maxWidth: '420px', display: 'flex', flexDirection: 'column', gap: '18px' }}
+          >
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Lock size={20} style={{ color: 'var(--primary-color)' }} />
+                <span>Staff Portal Access</span>
+              </h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Sign in using your government credentials.</p>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Work Email Address</label>
+              <input 
+                type="email" 
+                className="ai-input" 
+                style={{ width: '100%' }}
+                value={loginEmail} 
+                onChange={e => setLoginEmail(e.target.value)} 
+                placeholder="e.g. admin@munevo.gov" 
+                required 
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Secure Password</label>
+              <input 
+                type="password" 
+                className="ai-input" 
+                style={{ width: '100%' }}
+                value={loginPassword} 
+                onChange={e => setLoginPassword(e.target.value)} 
+                placeholder="••••••••" 
+                required 
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowLoginForm(false);
+                  setLoginEmail('');
+                  setLoginPassword('');
+                }} 
+                style={{ flex: 1, height: '40px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={authLoading}
+                style={{ flex: 2, height: '40px', background: 'linear-gradient(135deg, var(--primary-color), #2563eb)', border: 0, color: '#fff', borderRadius: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
+              >
+                {authLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                <span>{authLoading ? 'Verifying...' : 'Sign In'}</span>
               </button>
             </div>
           </form>

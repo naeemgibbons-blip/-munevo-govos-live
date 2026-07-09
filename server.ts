@@ -670,6 +670,36 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
+// 10.5. GET /api/profiles/me: Retrieve database profile for authenticated user
+app.get('/api/profiles/me', async (req, res) => {
+  const userId = req.headers['x-user-id'] as string;
+  const userEmail = req.headers['x-user-email'] as string;
+
+  if (!userId && !userEmail) {
+    return res.status(400).json({ error: 'x-user-id or x-user-email header is required' });
+  }
+
+  try {
+    const profile = await prisma.profile.findFirst({
+      where: userId ? { id: userId } : { email: userEmail },
+      include: {
+        organization: true,
+        role: {
+          include: { permissions: true }
+        }
+      }
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found in government database registry.' });
+    }
+
+    res.json(profile);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 10. POST /api/profiles/sync: Upsert a simulated profile for client login testing
 app.post('/api/profiles/sync', async (req, res) => {
   const { id, email, isGlobalAdmin, isOrgAdmin, organizationId, roleId } = req.body;

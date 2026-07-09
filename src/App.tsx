@@ -14,6 +14,7 @@ import { EmployeeRoster } from './components/EmployeeRoster';
 import { AuditTrail } from './components/AuditTrail';
 import { MobileFieldView } from './components/MobileFieldView';
 import { MarketingLanding } from './components/MarketingLanding';
+import { supabase } from './supabaseClient';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -76,6 +77,56 @@ function App() {
         console.error('Failed to load organizations directory:', err);
         setConnectionError('Munevo DB API Server is currently offline. Please run "npm run dev" or check port 3001.');
       });
+  }, []);
+
+  const resolveProfile = async (id: string, email: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/profiles/me`, {
+        headers: {
+          'x-user-id': id,
+          'x-user-email': email
+        }
+      });
+      if (res.ok) {
+        const profile = await res.json();
+        setCurrentProfile(profile);
+        if (profile.organization?.slug) {
+          setTenant(profile.organization.slug);
+        }
+        
+        // Auto-route based on administrative role
+        if (profile.isGlobalAdmin) {
+          setActiveModule('global-admin');
+        } else if (profile.isOrgAdmin) {
+          setActiveModule('org-admin');
+        } else {
+          setActiveModule('command-center');
+        }
+        setViewMode('module');
+      }
+    } catch (err) {
+      console.error('Failed to resolve profile registry context:', err);
+    }
+  };
+
+  // Synchronize Supabase authentication state changes
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        resolveProfile(session.user.id, session.user.email || '');
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        resolveProfile(session.user.id, session.user.email || '');
+      } else {
+        setCurrentProfile(null);
+        setViewMode('marketing');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const currentOrg = organizations.find(o => o.slug === tenant);
@@ -421,6 +472,7 @@ function App() {
   };
 
   const activeChartTab = chartTabs.find(t => t.id === activeChartTabId) || null;
+  const isDemoSandbox = currentProfile?.organization?.slug?.startsWith('demo-') || !currentProfile;
 
   if (viewMode === 'marketing') {
     return (
@@ -580,29 +632,35 @@ function App() {
               <span>Mobile Field Ops</span>
             </button>
 
-            <button 
-              onClick={() => setViewMode('marketing')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                border: '1px solid var(--border-color)',
-                background: 'rgba(255,255,255,0.03)',
-                color: '#fff',
-                padding: '6px 12px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              <span>View Marketing Page</span>
-            </button>
+            {isDemoSandbox && (
+              <button 
+                onClick={() => setViewMode('marketing')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid var(--border-color)',
+                  background: 'rgba(255,255,255,0.03)',
+                  color: '#fff',
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <span>View Marketing Page</span>
+              </button>
+            )}
 
             <button 
-              onClick={() => {
-                setCurrentProfile(null);
-                setViewMode('marketing');
+              onClick={async () => {
+                if (isDemoSandbox) {
+                  setCurrentProfile(null);
+                  setViewMode('marketing');
+                } else {
+                  await supabase.auth.signOut();
+                }
               }}
               style={{
                 display: 'flex',
@@ -618,18 +676,20 @@ function App() {
                 cursor: 'pointer'
               }}
             >
-              Exit to Sales Site
+              {isDemoSandbox ? 'Exit to Sales Site' : 'Sign Out'}
             </button>
 
-            <div className="role-switcher-container">
-              <span className="role-switcher-label">GovOS Session:</span>
-              <select className="role-select" value={currentRole.id} onChange={handleRoleChange}>
-                <option value="mayor">Mayor / City Manager</option>
-                <option value="inspector">Building Inspector</option>
-                <option value="resident">Resident (MyMunevo)</option>
-                <option value="global_admin">Global Administrator</option>
-              </select>
-            </div>
+            {isDemoSandbox && (
+              <div className="role-switcher-container">
+                <span className="role-switcher-label">GovOS Session:</span>
+                <select className="role-select" value={currentRole.id} onChange={handleRoleChange}>
+                  <option value="mayor">Mayor / City Manager</option>
+                  <option value="inspector">Building Inspector</option>
+                  <option value="resident">Resident (MyMunevo)</option>
+                  <option value="global_admin">Global Administrator</option>
+                </select>
+              </div>
+            )}
 
             <div className="notification-bell" onClick={() => addNotification('System audit logs are fully synced.')}>
               <Bell size={18} />
