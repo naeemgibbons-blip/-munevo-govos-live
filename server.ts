@@ -557,6 +557,46 @@ app.get('/api/demo/requests', async (req, res) => {
   }
 });
 
+// 6.7. GET /api/auth/bootstrap-status: Check if any Global Admin profiles exist
+app.get('/api/auth/bootstrap-status', async (req, res) => {
+  try {
+    const count = await prisma.profile.count({
+      where: { isGlobalAdmin: true }
+    });
+    res.json({ hasGlobalAdmin: count > 0 });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6.8. POST /api/auth/bootstrap: Provision the first Global Admin profile securely
+app.post('/api/auth/bootstrap', async (req, res) => {
+  const { userId, email } = req.body;
+  if (!userId || !email) {
+    return res.status(400).json({ error: 'userId and email are required.' });
+  }
+  try {
+    const count = await prisma.profile.count({
+      where: { isGlobalAdmin: true }
+    });
+    if (count > 0) {
+      return res.status(403).json({ error: 'Platform already bootstrapped. Hijack blocked.' });
+    }
+    const profile = await prisma.profile.create({
+      data: {
+        id: userId,
+        email,
+        isGlobalAdmin: true,
+        isOrgAdmin: false,
+        organizationId: null,
+        roleId: null
+      }
+    });
+    res.status(201).json(profile);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // 7. GET /api/invites: List invites
 app.get('/api/invites', async (req, res) => {
