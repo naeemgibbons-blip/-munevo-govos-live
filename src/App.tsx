@@ -48,7 +48,7 @@ function App() {
 
   // Layout Modules
   const [activeModule, setActiveModule] = useState('command-center');
-  const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field' | 'marketing'>('marketing');
+  const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field' | 'marketing'>('module');
 
   // Chart Workspace Tabs State
   const [chartTabs, setChartTabs] = useState<ChartTabItem[]>([]);
@@ -578,6 +578,25 @@ function App() {
             >
               <Smartphone size={12} style={{ color: 'var(--accent-color)' }} />
               <span>Mobile Field Ops</span>
+            </button>
+
+            <button 
+              onClick={() => setViewMode('marketing')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: '1px solid var(--border-color)',
+                background: 'rgba(255,255,255,0.03)',
+                color: '#fff',
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              <span>View Marketing Page</span>
             </button>
 
             <button 
