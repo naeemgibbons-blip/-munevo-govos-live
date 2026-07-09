@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
+import { Logo } from './components/Logo';
 import { CommandCenter } from './components/CommandCenter';
 import { ChartingSystem, ChartTabItem } from './components/ChartingSystem';
 import { GisMap } from './components/GisMap';
@@ -525,126 +526,191 @@ function App() {
       />
 
       <main className="main-panel">
-        <header className="dashboard-header">
-          <div className="header-search" style={{ position: 'relative' }}>
-            <input 
-              type="text" 
-              placeholder="Search properties, permits, cases (e.g. 'Ferry St', 'PM-2026')..." 
-              value={searchVal}
-              onChange={(e) => setSearchVal(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-            />
-            <Search className="header-search-icon" size={14} />
+        {['resident', 'business', 'contractor'].includes(currentRole.id) ? (
+          <header className="dashboard-header" style={{
+            background: '#16181d',
+            borderBottom: '1px solid #2a2e37',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            padding: '14px 24px',
+            height: '70px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+              <Logo size={28} variant={currentRole.id as any} wordmarkSize="1.25rem" />
+            </div>
+            <span style={{ 
+              fontSize: '0.8rem', 
+              color: '#9aa3b2', 
+              borderLeft: '1px solid #2a2e37', 
+              paddingLeft: '14px',
+              fontFamily: '"Montserrat", sans-serif',
+              fontWeight: 600
+            }}>
+              {currentRole.id.charAt(0).toUpperCase() + currentRole.id.slice(1)} · City of {tenant === 'newark' ? 'Newark' : tenant === 'austin' ? 'Austin' : 'Seattle'}
+            </span>
 
-            {searchFocused && searchResults && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                background: '#11131c',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                marginTop: '6px',
-                maxHeight: '320px',
-                overflowY: 'auto',
-                zIndex: 1000,
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
-              }}>
-                {Object.keys(searchResults).map(category => {
-                  const items = searchResults[category];
-                  if (items.length === 0) return null;
-                  return (
-                    <div key={category} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                      <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--primary-color)', padding: '6px 12px', background: 'rgba(255,255,255,0.01)', textTransform: 'uppercase' }}>
-                        {category}
-                      </div>
-                      {items.map((item: any) => (
-                        <div 
-                          key={item.id} 
-                          onClick={() => {
-                            handleOpenChart(item.type, item.id);
-                            setSearchVal('');
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            fontSize: '11.5px',
-                            color: '#fff',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '2px'
-                          }}
-                        >
-                          <span style={{ fontWeight: 600 }}>{item.label}</span>
-                          <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)' }}>{item.sub}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {isDemoSandbox && (
+                <div className="role-switcher-container" style={{ margin: 0 }}>
+                  <span className="role-switcher-label">GovOS Session:</span>
+                  <select className="role-select" value={currentRole.id} onChange={handleRoleChange}>
+                    <option value="mayor">Mayor / City Manager</option>
+                    <option value="inspector">Building Inspector</option>
+                    <option value="resident">Resident (MyMunevo Resident)</option>
+                    <option value="business">Business Owner (MyMunevo Business)</option>
+                    <option value="contractor">Contractor (MyMunevo Contractor)</option>
+                    <option value="global_admin">Global Administrator</option>
+                  </select>
+                </div>
+              )}
 
-          <div className="header-actions">
-            {chartTabs.length > 0 && (
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
-                <button 
-                  onClick={() => setViewMode('module')}
-                  style={{
-                    border: 'none',
-                    background: viewMode === 'module' ? 'var(--primary-glow)' : 'transparent',
-                    color: viewMode === 'module' ? '#fff' : 'var(--text-secondary)',
-                    padding: '6px 12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Dashboard View
-                </button>
-                <button 
-                  onClick={() => setViewMode('chart')}
-                  style={{
-                    border: 'none',
-                    background: viewMode === 'chart' ? 'var(--primary-glow)' : 'transparent',
-                    color: viewMode === 'chart' ? '#fff' : 'var(--text-secondary)',
-                    padding: '6px 12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Chart Workspace ({chartTabs.length})
-                </button>
-              </div>
-            )}
-            {/* Mobile Field View Switcher */}
-            <button 
-              onClick={() => setViewMode('mobile-field')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                border: '1px solid var(--border-color)',
-                background: 'rgba(255,255,255,0.03)',
-                color: '#fff',
-                padding: '6px 12px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              <Smartphone size={12} style={{ color: 'var(--accent-color)' }} />
-              <span>Mobile Field Ops</span>
-            </button>
+              <span style={{ fontSize: '0.82rem', color: '#9aa3b2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {currentRole.id === 'business' ? 'Maple Street Deli' : currentRole.id === 'contractor' ? 'BuildCorp Inc' : 'John Doe'}
+                <div style={{ 
+                  width: '30px', 
+                  height: '30px', 
+                  borderRadius: '50%', 
+                  background: '#1e2128', 
+                  border: '1px solid #2a2e37',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#fff'
+                }}>
+                  {currentRole.id === 'business' ? 'M' : currentRole.id === 'contractor' ? 'B' : 'J'}
+                </div>
+              </span>
 
-            {isDemoSandbox && (
               <button 
-                onClick={() => setViewMode('marketing')}
+                onClick={async () => {
+                  if (isDemoSandbox) {
+                    setCurrentProfile(null);
+                    setViewMode('marketing');
+                  } else {
+                    await supabase.auth.signOut();
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  background: 'rgba(239, 68, 68, 0.05)',
+                  color: 'var(--danger-text)',
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                Exit
+              </button>
+            </div>
+          </header>
+        ) : (
+          <header className="dashboard-header">
+            <div className="header-search" style={{ position: 'relative' }}>
+              <input 
+                type="text" 
+                placeholder="Search properties, permits, cases (e.g. 'Ferry St', 'PM-2026')..." 
+                value={searchVal}
+                onChange={(e) => setSearchVal(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+              />
+              <Search className="header-search-icon" size={14} />
+
+              {searchFocused && searchResults && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: '#11131c',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  marginTop: '6px',
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  zIndex: 1000,
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                }}>
+                  {Object.keys(searchResults).map(category => {
+                    const items = searchResults[category];
+                    if (items.length === 0) return null;
+                    return (
+                      <div key={category} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--primary-color)', padding: '6px 12px', background: 'rgba(255,255,255,0.01)', textTransform: 'uppercase' }}>
+                          {category}
+                        </div>
+                        {items.map((item: any) => (
+                          <div 
+                            key={item.id} 
+                            onClick={() => {
+                              handleOpenChart(item.type, item.id);
+                              setSearchVal('');
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              fontSize: '11.5px',
+                              color: '#fff',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px'
+                            }}
+                          >
+                            <span style={{ fontWeight: 600 }}>{item.label}</span>
+                            <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)' }}>{item.sub}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="header-actions">
+              {chartTabs.length > 0 && (
+                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <button 
+                    onClick={() => setViewMode('module')}
+                    style={{
+                      border: 'none',
+                      background: viewMode === 'module' ? 'var(--primary-glow)' : 'transparent',
+                      color: viewMode === 'module' ? '#fff' : 'var(--text-secondary)',
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Dashboard View
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('chart')}
+                    style={{
+                      border: 'none',
+                      background: viewMode === 'chart' ? 'var(--primary-glow)' : 'transparent',
+                      color: viewMode === 'chart' ? '#fff' : 'var(--text-secondary)',
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Chart Workspace ({chartTabs.length})
+                  </button>
+                </div>
+              )}
+              {/* Mobile Field View Switcher */}
+              <button 
+                onClick={() => setViewMode('mobile-field')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -659,54 +725,78 @@ function App() {
                   cursor: 'pointer'
                 }}
               >
-                <span>View Marketing Page</span>
+                <Smartphone size={12} style={{ color: 'var(--accent-color)' }} />
+                <span>Mobile Field Ops</span>
               </button>
-            )}
 
-            <button 
-              onClick={async () => {
-                if (isDemoSandbox) {
-                  setCurrentProfile(null);
-                  setViewMode('marketing');
-                } else {
-                  await supabase.auth.signOut();
-                }
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                background: 'rgba(239, 68, 68, 0.05)',
-                color: 'var(--danger-text)',
-                padding: '6px 12px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              {isDemoSandbox ? 'Exit to Sales Site' : 'Sign Out'}
-            </button>
+              {isDemoSandbox && (
+                <button 
+                  onClick={() => setViewMode('marketing')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    border: '1px solid var(--border-color)',
+                    background: 'rgba(255,255,255,0.03)',
+                    color: '#fff',
+                    padding: '6px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span>View Marketing Page</span>
+                </button>
+              )}
 
-            {isDemoSandbox && (
-              <div className="role-switcher-container">
-                <span className="role-switcher-label">GovOS Session:</span>
-                <select className="role-select" value={currentRole.id} onChange={handleRoleChange}>
-                  <option value="mayor">Mayor / City Manager</option>
-                  <option value="inspector">Building Inspector</option>
-                  <option value="resident">Resident (MyMunevo)</option>
-                  <option value="global_admin">Global Administrator</option>
-                </select>
+              <button 
+                onClick={async () => {
+                  if (isDemoSandbox) {
+                    setCurrentProfile(null);
+                    setViewMode('marketing');
+                  } else {
+                    await supabase.auth.signOut();
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  background: 'rgba(239, 68, 68, 0.05)',
+                  color: 'var(--danger-text)',
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                {isDemoSandbox ? 'Exit to Sales Site' : 'Sign Out'}
+              </button>
+
+              {isDemoSandbox && (
+                <div className="role-switcher-container">
+                  <span className="role-switcher-label">GovOS Session:</span>
+                  <select className="role-select" value={currentRole.id} onChange={handleRoleChange}>
+                    <option value="mayor">Mayor / City Manager</option>
+                    <option value="inspector">Building Inspector</option>
+                    <option value="resident">Resident (MyMunevo Resident)</option>
+                    <option value="business">Business Owner (MyMunevo Business)</option>
+                    <option value="contractor">Contractor (MyMunevo Contractor)</option>
+                    <option value="global_admin">Global Administrator</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="notification-bell" onClick={() => addNotification('System audit logs are fully synced.')}>
+                <Bell size={18} />
+                <div className="notification-badge" />
               </div>
-            )}
-
-            <div className="notification-bell" onClick={() => addNotification('System audit logs are fully synced.')}>
-              <Bell size={18} />
-              <div className="notification-badge" />
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         <div className="workspace-canvas">
           <div className="pane-left">

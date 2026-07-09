@@ -1,4 +1,5 @@
 import React from 'react';
+import { Logo } from './Logo';
 import { 
   Building2, 
   Map, 
@@ -109,9 +110,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-header">
-        <div className="brand-logo">M</div>
-        <div className="brand-name">Munevo</div>
+      <div className="sidebar-header" style={{ padding: '20px 24px' }}>
+        <Logo 
+          variant={
+            currentProfile?.isGlobalAdmin ? 'master' : 
+            ['resident', 'business', 'contractor'].includes(currentRole.id) ? (currentRole.id as any) : 'master'
+          } 
+          size={28} 
+          wordmarkSize="1.15rem" 
+        />
       </div>
 
       <div className="tenant-selector">

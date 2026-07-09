@@ -59,6 +59,38 @@ export const USER_ROLES: Record<string, UserRole> = {
       sections: ['My Portal Dashboard', 'Submit 311 Service Request', 'Bills & Payments', 'Neighborhood GIS Feed']
     }
   },
+  business: {
+    id: 'business',
+    name: 'Business Owner (MyMunevo Business)',
+    department: 'Public Portal',
+    description: 'Business licenses, local commercial tax registry, inspections queue, and merchant portal.',
+    commandCenter: {
+      actions: ['Renew Mercantile License', 'Apply for Sign Permit', 'Report Commercial Issue', 'Request Health Inspection'],
+      metrics: [
+        { label: 'Mercantile Status', value: 'Active', status: 'normal' },
+        { label: 'Licenses Expiring', value: '0 Files', status: 'normal' },
+        { label: 'Active Inspections', value: '1 Scheduled', status: 'normal' },
+        { label: 'Commercial Filings', value: 'Good Standing', status: 'normal' }
+      ],
+      sections: ['My Business Dashboard', 'Mercantile License Registry', 'Zoning & Inspections Feed', 'Business Alerts Board']
+    }
+  },
+  contractor: {
+    id: 'contractor',
+    name: 'Contractor (MyMunevo Contractor)',
+    department: 'Public Portal',
+    description: 'Structural permits applications, license validations, inspection logs, and contractor desk.',
+    commandCenter: {
+      actions: ['Submit Building Permit', 'Associate License Credentials', 'Schedule Inspection Review', 'Submit Architectural Plans'],
+      metrics: [
+        { label: 'Zoning Permits', value: '3 Active', status: 'normal' },
+        { label: 'License Standing', value: 'Good', status: 'normal' },
+        { label: 'Failed Inspections', value: '1 Case', status: 'alert' },
+        { label: 'Plan Review Steps', value: '2 Pending', status: 'normal' }
+      ],
+      sections: ['Contractor Workspace', 'Building Permits Desk', 'Inspections & Milestones Tracker', 'Licensing Validations']
+    }
+  },
   clerk: {
     id: 'clerk',
     name: 'Municipal Clerk',
