@@ -452,17 +452,8 @@ app.post('/api/demo/spinup', async (req, res) => {
         permitNumber: `PEM-DEMO-${rand}`,
         type: 'Commercial Renovation',
         status: 'Issued',
-        description: 'Upgrade first floor storefront fire safety barriers.',
-        costEstimate: 25000,
-        feePaid: 250,
-        propertyId: prop.id,
-        workflowSteps: [
-          { name: 'Application Intake', status: 'Completed', completedDate: '2026-07-01' },
-          { name: 'Plan Review', status: 'Completed', completedDate: '2026-07-04' },
-          { name: 'Fee Payment', status: 'Completed', completedDate: '2026-07-04' },
-          { name: 'Inspections', status: 'In Progress' },
-          { name: 'Final Sign-off', status: 'Pending' }
-        ]
+        estimatedCost: 25000,
+        propertyId: prop.id
       }
     });
 
