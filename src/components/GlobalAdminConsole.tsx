@@ -75,23 +75,30 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
     'command-center', 'tracker', 'gis', 'permits', 'code-enforcement', 'legislative', 'open-records'
   ]);
 
+  // Lead and tab management states
+  const [activeConsoleTab, setActiveConsoleTab] = useState<'directory' | 'leads'>('directory');
+  const [demoRequests, setDemoRequests] = useState<any[]>([]);
+
   // Fetch Data
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [resOrgs, resProfiles, resInvites] = await Promise.all([
+      const [resOrgs, resProfiles, resInvites, resRequests] = await Promise.all([
         fetch(`${API_URL}/api/organizations`),
         fetch(`${API_URL}/api/profiles`),
-        fetch(`${API_URL}/api/invites`)
+        fetch(`${API_URL}/api/invites`),
+        fetch(`${API_URL}/api/demo/requests`).catch(() => null)
       ]);
 
       const orgsData = await resOrgs.json();
       const profilesData = await resProfiles.json();
       const invitesData = await resInvites.json();
+      const requestsData = resRequests ? await resRequests.json() : [];
 
       setOrganizations(orgsData);
       setProfiles(profilesData);
       setInvites(invitesData);
+      setDemoRequests(requestsData);
     } catch (err) {
       console.error('Failed to load global admin console records:', err);
       addNotification('Offline: Failed to load directory data.');
@@ -228,8 +235,52 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
         </div>
       </div>
 
-      {/* Grid of Forms */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+      {/* Tab Selectors */}
+      <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px' }}>
+        <button 
+          onClick={() => setActiveConsoleTab('directory')}
+          style={{
+            border: 0,
+            background: activeConsoleTab === 'directory' ? 'rgba(245,158,11,0.15)' : 'transparent',
+            color: activeConsoleTab === 'directory' ? '#f59e0b' : 'var(--text-secondary)',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.85rem'
+          }}
+        >
+          Municipal Directory
+        </button>
+        <button 
+          onClick={() => setActiveConsoleTab('leads')}
+          style={{
+            border: 0,
+            background: activeConsoleTab === 'leads' ? 'rgba(245,158,11,0.15)' : 'transparent',
+            color: activeConsoleTab === 'leads' ? '#f59e0b' : 'var(--text-secondary)',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <span>Demo Requests / Leads</span>
+          {demoRequests.length > 0 && (
+            <span style={{ background: '#f59e0b', color: '#000', borderRadius: '100px', padding: '2px 6px', fontSize: '9px', fontWeight: 800 }}>
+              {demoRequests.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeConsoleTab === 'directory' ? (
+        <>
+          {/* Grid of Forms */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
         
         {/* Form 1: Create Municipality */}
         <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', justifyItems: 'center', justifyContent: 'center', alignItems: 'center', gap: '12px', minHeight: '220px', textAlign: 'center' }}>
@@ -388,6 +439,49 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
         </div>
 
       </div>
+      </>
+      ) : (
+        <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 16px 0', color: '#fff' }}>Demo Requests Leads ({demoRequests.length})</h3>
+          
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '12px' }}>Date</th>
+                  <th style={{ padding: '12px' }}>Prospect Name</th>
+                  <th style={{ padding: '12px' }}>Work Email</th>
+                  <th style={{ padding: '12px' }}>Municipality / Agency</th>
+                  <th style={{ padding: '12px' }}>Objective / Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {demoRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No demo requests received yet.
+                    </td>
+                  </tr>
+                ) : (
+                  demoRequests.map(req => (
+                    <tr key={req.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#fff' }}>
+                      <td style={{ padding: '12px', color: 'var(--text-muted)' }}>
+                        {new Date(req.createdAt).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '12px', fontWeight: 600 }}>{req.name}</td>
+                      <td style={{ padding: '12px', color: 'var(--primary-color)' }}>{req.email}</td>
+                      <td style={{ padding: '12px' }}>{req.municipality}</td>
+                      <td style={{ padding: '12px', color: 'var(--text-secondary)', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={req.notes || ''}>
+                        {req.notes || '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Setup Onboarding Wizard Dialog */}
       {wizardStep > 0 && (

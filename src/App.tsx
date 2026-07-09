@@ -49,7 +49,7 @@ function App() {
 
   // Layout Modules
   const [activeModule, setActiveModule] = useState('command-center');
-  const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field' | 'marketing'>('module');
+  const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field' | 'marketing'>('marketing');
 
   // Chart Workspace Tabs State
   const [chartTabs, setChartTabs] = useState<ChartTabItem[]>([]);
@@ -128,6 +128,18 @@ function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Dynamically toggle body overflow scroll locks based on active viewMode
+  useEffect(() => {
+    if (viewMode === 'marketing') {
+      document.body.style.overflow = 'auto';
+    } else {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = 'hidden';
+    };
+  }, [viewMode]);
 
   const currentOrg = organizations.find(o => o.slug === tenant);
   const currentOrgId = currentOrg?.id || '';
@@ -474,8 +486,9 @@ function App() {
   const activeChartTab = chartTabs.find(t => t.id === activeChartTabId) || null;
   const isDemoSandbox = currentProfile?.organization?.slug?.startsWith('demo-') || !currentProfile;
 
-  if (viewMode === 'marketing') {
-    return (
+  let content;
+  if (viewMode === 'marketing' || !currentProfile) {
+    content = (
       <MarketingLanding 
         onLoginDemo={(demoProfile) => {
           setCurrentProfile(demoProfile);
@@ -488,20 +501,17 @@ function App() {
         addNotification={addNotification}
       />
     );
-  }
-
-  if (viewMode === 'mobile-field') {
-    return (
+  } else if (viewMode === 'mobile-field') {
+    content = (
       <MobileFieldView 
         currentProfile={currentProfile}
         addNotification={addNotification}
         onExit={() => setViewMode('module')}
       />
     );
-  }
-
-  return (
-    <div className="app-container">
+  } else {
+    content = (
+      <div className="app-container">
       <Sidebar 
         activeModule={activeModule}
         setActiveModule={(mod) => {
@@ -886,7 +896,13 @@ function App() {
           />
         </div>
       </main>
+    </div>
+    );
+  }
 
+  return (
+    <>
+      {content}
       <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {toasts.map(toast => (
           <div key={toast.id} className="toast">
@@ -897,7 +913,7 @@ function App() {
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 

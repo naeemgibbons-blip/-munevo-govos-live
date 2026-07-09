@@ -355,3 +355,13 @@ model CaseComment {
   message        String
   createdAt      DateTime         @default(now())
 }
+
+// 15. Marketing Lead / Demo Request Table
+model DemoRequest {
+  id             String       @id @default(uuid())
+  name           String
+  email          String
+  municipality   String
+  notes          String?
+  createdAt      DateTime     @default(now())
+}

@@ -529,6 +529,35 @@ app.post('/api/demo/spinup', async (req, res) => {
   }
 });
 
+// 6.5. POST /api/demo/requests: Capture a demo lead request from the marketing page
+app.post('/api/demo/requests', async (req, res) => {
+  const { name, email, municipality, notes } = req.body;
+  if (!name || !email || !municipality) {
+    return res.status(400).json({ error: 'Name, email, and municipality fields are required.' });
+  }
+  try {
+    const lead = await prisma.demoRequest.create({
+      data: { name, email, municipality, notes }
+    });
+    res.status(201).json(lead);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6.6. GET /api/demo/requests: Retrieve all marketing leads
+app.get('/api/demo/requests', async (req, res) => {
+  try {
+    const leads = await prisma.demoRequest.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(leads);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // 7. GET /api/invites: List invites
 app.get('/api/invites', async (req, res) => {
   const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
@@ -1266,6 +1295,10 @@ app.post('/api/case-comments', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Munevo DB API Server listening on http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Munevo DB API Server listening on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

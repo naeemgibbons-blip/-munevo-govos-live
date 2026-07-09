@@ -25,7 +25,7 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
   onEnterApp,
   addNotification
 }) => {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
   const [demoLoading, setDemoLoading] = useState(false);
   
   // Request Demo Form States
@@ -114,14 +114,29 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
     }
   };
 
-  const handleDemoSubmit = (e: React.FormEvent) => {
+  const handleDemoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addNotification(`Thank you ${name}! A GovOS specialist will contact the ${municipality} team soon.`);
-    setName('');
-    setEmail('');
-    setMunicipality('');
-    setNotes('');
-    setShowRequestForm(false);
+    try {
+      const res = await fetch(`${API_URL}/api/demo/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, municipality, notes })
+      });
+      if (res.ok) {
+        addNotification(`Thank you ${name}! A GovOS specialist will contact the ${municipality} team soon.`);
+        setName('');
+        setEmail('');
+        setMunicipality('');
+        setNotes('');
+        setShowRequestForm(false);
+      } else {
+        const errData = await res.json();
+        addNotification(`Submit Error: ${errData.error || 'Failed submitting contact details.'}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      addNotification('API connection error submitting demo request.');
+    }
   };
 
   return (
