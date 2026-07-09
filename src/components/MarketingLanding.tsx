@@ -396,7 +396,6 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
                     <span style={{ fontSize: '0.86rem', color: '#9AA3B2' }}>For residents &amp; homeowners</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0, background: '#2F6FED' }}></span>
-                      <span style={{ fontSize: '0.74rem', color: '#9AA3B2', fontFamily: 'monospace' }}>#2F6FED</span>
                     </span>
                   </div>
                 </div>
@@ -429,7 +428,6 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
                     <span style={{ fontSize: '0.86rem', color: '#9AA3B2' }}>For business owners</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0, background: '#1FBF75' }}></span>
-                      <span style={{ fontSize: '0.74rem', color: '#9AA3B2', fontFamily: 'monospace' }}>#1FBF75</span>
                     </span>
                   </div>
                 </div>
@@ -462,7 +460,6 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
                     <span style={{ fontSize: '0.86rem', color: '#9AA3B2' }}>For licensed contractors</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0, background: '#F5A524' }}></span>
-                      <span style={{ fontSize: '0.74rem', color: '#9AA3B2', fontFamily: 'monospace' }}>#F5A524</span>
                     </span>
                   </div>
                 </div>
