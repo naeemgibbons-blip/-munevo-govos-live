@@ -14,6 +14,7 @@ model Organization {
   name                String               @unique // e.g., "City of Newark"
   slug                String               @unique // e.g., "newark"
   createdAt           DateTime             @default(now())
+  enabledModules      String               @default("all")
   
   // Relations
   profiles            Profile[]

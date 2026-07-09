@@ -68,8 +68,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'identity-security', name: 'Identity & Security', icon: ShieldCheck, group: 'Administration' }
   ];
 
-  // Filter Menu items based on active User Profile Permissions
+  // Filter Menu items based on active User Profile & Organization level enabled modules
   const menuItems = baseMenuItems.filter(item => {
+    // 1. Check if module is disabled on organization level
+    const enabledModulesStr = currentProfile?.organization?.enabledModules || 'all';
+    if (enabledModulesStr !== 'all') {
+      const enabledSet = new Set(enabledModulesStr.split(','));
+      const isSystemModule = ['command-center', 'employee-roster', 'system-audit', 'identity-security', 'global-admin', 'org-admin'].includes(item.id);
+      if (!isSystemModule && !enabledSet.has(item.id)) {
+        return false;
+      }
+    }
+
+    // 2. Filter by user role permissions
     // Admins have access to everything
     if (currentProfile?.isGlobalAdmin || currentProfile?.isOrgAdmin) {
       return true;

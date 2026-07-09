@@ -331,14 +331,18 @@ app.post('/api/organizations', async (req, res) => {
 
 // 6.5. POST /api/onboarding: Guided Setup Wizard
 app.post('/api/onboarding', async (req, res) => {
-  const { name, slug, templateType, adminEmail, invitedById } = req.body;
+  const { name, slug, templateType, adminEmail, invitedById, enabledModules } = req.body;
   if (!name || !slug || !adminEmail) {
     return res.status(400).json({ error: 'name, slug, and adminEmail are required' });
   }
 
   try {
     const org = await prisma.organization.create({
-      data: { name, slug }
+      data: { 
+        name, 
+        slug, 
+        enabledModules: enabledModules || 'all'
+      }
     });
 
     const rolesList: { name: string; permissions: string[] }[] = [];
@@ -391,6 +395,136 @@ app.post('/api/onboarding', async (req, res) => {
 
     res.status(201).json({ org, invite });
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6.6. POST /api/demo/spinup: Spin up fresh temporary sandbox organization for prospect
+app.post('/api/demo/spinup', async (req, res) => {
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  const slug = `demo-${rand}`;
+  const name = `Demo City (Prospect #${rand})`;
+
+  try {
+    const org = await prisma.organization.create({
+      data: { name, slug, enabledModules: 'all' }
+    });
+
+    // Create standard roles
+    const roles = [
+      { name: 'Mayor / City Manager', permissions: ['command-center', 'tracker', 'gis', 'permits', 'code-enforcement', 'legislative'] },
+      { name: 'City Clerk', permissions: ['command-center', 'tracker', 'legislative', 'open-records'] },
+      { name: 'Building Inspector', permissions: ['command-center', 'tracker', 'gis', 'permits', 'code-enforcement'] }
+    ];
+
+    for (const r of roles) {
+      const newRole = await prisma.customRole.create({
+        data: { organizationId: org.id, name: r.name }
+      });
+      await prisma.permission.createMany({
+        data: r.permissions.map(mod => ({
+          roleId: newRole.id,
+          module: mod,
+          canView: true,
+          canEdit: true
+        }))
+      });
+    }
+
+    // Seed mock Property
+    const prop = await prisma.property.create({
+      data: {
+        organizationId: org.id,
+        address: '12 Ferry St, Demo City, NJ',
+        zipCode: '07105',
+        ownerName: 'Horizon Real Estate LLC',
+        assessedValue: 420000,
+        taxStatus: 'Paid',
+        zoningDistrict: 'MXD-1',
+        gisCoords: [40.732, -74.155]
+      }
+    });
+
+    // Seed mock Permit
+    const permit = await prisma.permit.create({
+      data: {
+        organizationId: org.id,
+        permitNumber: `PEM-DEMO-${rand}`,
+        type: 'Commercial Renovation',
+        status: 'Issued',
+        description: 'Upgrade first floor storefront fire safety barriers.',
+        costEstimate: 25000,
+        feePaid: 250,
+        propertyId: prop.id,
+        workflowSteps: [
+          { name: 'Application Intake', status: 'Completed', completedDate: '2026-07-01' },
+          { name: 'Plan Review', status: 'Completed', completedDate: '2026-07-04' },
+          { name: 'Fee Payment', status: 'Completed', completedDate: '2026-07-04' },
+          { name: 'Inspections', status: 'In Progress' },
+          { name: 'Final Sign-off', status: 'Pending' }
+        ]
+      }
+    });
+
+    // Seed mock Inspection
+    await prisma.inspection.create({
+      data: {
+        organizationId: org.id,
+        permitId: permit.id,
+        propertyId: prop.id,
+        type: 'Structural Review',
+        scheduledDate: '2026-07-10',
+        status: 'Pending',
+        inspectorName: 'Elena Rostova',
+        notes: ''
+      }
+    });
+
+    // Seed mock Ticket
+    await prisma.trackerItem.create({
+      data: {
+        organizationId: org.id,
+        module: '311',
+        title: 'Damaged Sidewalk Safety Hazard',
+        status: 'Open',
+        priority: 'High',
+        assignedTo: 'Public Works Operations',
+        slaDays: 2,
+        slaProgress: 10,
+        propertyId: prop.id
+      }
+    });
+
+    // Create Simulated Profile for prospect
+    const profile = await prisma.profile.create({
+      data: {
+        id: `demo-admin-${rand}`,
+        email: `prospect@democity-${rand}.gov`,
+        isOrgAdmin: true,
+        organizationId: org.id
+      },
+      include: {
+        organization: true
+      }
+    });
+
+    // Garbage collection of old demo organizations (> 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const oldDemoOrgs = await prisma.organization.findMany({
+      where: {
+        slug: { startsWith: 'demo-' },
+        createdAt: { lt: oneDayAgo }
+      }
+    });
+    for (const oldOrg of oldDemoOrgs) {
+      await prisma.organization.delete({
+        where: { id: oldOrg.id }
+      }).catch(e => console.error('Failed cleanup of old demo org:', e));
+    }
+
+    res.status(201).json({ profile, organization: org });
+  } catch (err: any) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });

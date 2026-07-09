@@ -71,6 +71,9 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
   const [wizardOrgSlug, setWizardOrgSlug] = useState('');
   const [wizardTemplate, setWizardTemplate] = useState<'STANDARD' | 'CORE' | 'BLANK'>('STANDARD');
   const [wizardAdminEmail, setWizardAdminEmail] = useState('');
+  const [wizardModules, setWizardModules] = useState<string[]>([
+    'command-center', 'tracker', 'gis', 'permits', 'code-enforcement', 'legislative', 'open-records'
+  ]);
 
   // Fetch Data
   const fetchData = async () => {
@@ -175,7 +178,8 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
           slug: wizardOrgSlug.toLowerCase().replace(/\s+/g, '-'),
           templateType: wizardTemplate,
           adminEmail: wizardAdminEmail,
-          invitedById: currentProfile?.id || 'simulated-user-global_admin'
+          invitedById: currentProfile?.id || 'simulated-user-global_admin',
+          enabledModules: wizardModules.join(',')
         })
       });
 
@@ -474,6 +478,39 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
                     >
                       <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Blank Slate</div>
                       <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>Start with clean roles slate; configuration managed later in Org Console.</div>
+                    </div>
+                  </div>
+
+                  {/* Enabled Modules Checklist */}
+                  <div style={{ marginTop: '10px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', padding: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Select Client Modules to Enable</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      {[
+                        { id: 'tracker', label: 'Universal Tracker' },
+                        { id: 'permits', label: 'Permits & Licensing' },
+                        { id: 'code-enforcement', label: 'Code Enforcement' },
+                        { id: 'gis', label: 'GIS Mappings Map' },
+                        { id: 'open-records', label: 'Open Records (FOIA)' },
+                        { id: 'legislative', label: 'Legislative Hub' }
+                      ].map(mod => {
+                        const isEnabled = wizardModules.includes(mod.id);
+                        return (
+                          <label key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: '#fff', cursor: 'pointer' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isEnabled} 
+                              onChange={() => {
+                                if (isEnabled) {
+                                  setWizardModules(prev => prev.filter(m => m !== mod.id));
+                                } else {
+                                  setWizardModules(prev => [...prev, mod.id]);
+                                }
+                              }}
+                            />
+                            <span>{mod.label}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
 

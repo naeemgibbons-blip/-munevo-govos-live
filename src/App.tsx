@@ -13,6 +13,7 @@ import { OpenRecords } from './components/OpenRecords';
 import { EmployeeRoster } from './components/EmployeeRoster';
 import { AuditTrail } from './components/AuditTrail';
 import { MobileFieldView } from './components/MobileFieldView';
+import { MarketingLanding } from './components/MarketingLanding';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -47,7 +48,7 @@ function App() {
 
   // Layout Modules
   const [activeModule, setActiveModule] = useState('command-center');
-  const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field'>('module');
+  const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field' | 'marketing'>('marketing');
 
   // Chart Workspace Tabs State
   const [chartTabs, setChartTabs] = useState<ChartTabItem[]>([]);
@@ -421,6 +422,22 @@ function App() {
 
   const activeChartTab = chartTabs.find(t => t.id === activeChartTabId) || null;
 
+  if (viewMode === 'marketing') {
+    return (
+      <MarketingLanding 
+        onLoginDemo={(demoProfile) => {
+          setCurrentProfile(demoProfile);
+          setTenant(demoProfile.organization.slug);
+          setViewMode('module');
+        }}
+        onEnterApp={() => {
+          setViewMode('module');
+        }}
+        addNotification={addNotification}
+      />
+    );
+  }
+
   if (viewMode === 'mobile-field') {
     return (
       <MobileFieldView 
@@ -561,6 +578,28 @@ function App() {
             >
               <Smartphone size={12} style={{ color: 'var(--accent-color)' }} />
               <span>Mobile Field Ops</span>
+            </button>
+
+            <button 
+              onClick={() => {
+                setCurrentProfile(null);
+                setViewMode('marketing');
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                background: 'rgba(239, 68, 68, 0.05)',
+                color: 'var(--danger-text)',
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              Exit to Sales Site
             </button>
 
             <div className="role-switcher-container">
