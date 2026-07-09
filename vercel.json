@@ -23,12 +23,8 @@
       "dest": "/assets/$1"
     },
     {
-      "src": "/favicon.svg",
-      "dest": "/favicon.svg"
-    },
-    {
-      "src": "/munevo_hero.jpg",
-      "dest": "/munevo_hero.jpg"
+      "src": "/(.*\\.(jpg|jpeg|png|gif|svg|ico|json))",
+      "dest": "/$1"
     },
     {
       "src": "/(.*)",
