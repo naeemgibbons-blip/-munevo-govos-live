@@ -548,6 +548,14 @@ app.get('/api/demo/requests', async (req, res) => {
   }
 });
 
+// 6.65. GET /api/auth/config: Expose Supabase connection credentials dynamically from backend environment
+app.get('/api/auth/config', (req, res) => {
+  res.json({
+    supabaseUrl: process.env.VITE_SUPABASE_URL || 'https://ihwtaxltvsgfvgcgcpdw.supabase.co',
+    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || 'dummy-anon-key-placeholder'
+  });
+});
+
 // 6.7. GET /api/auth/bootstrap-status: Check if any Global Admin profiles exist
 app.get('/api/auth/bootstrap-status', async (req, res) => {
   try {

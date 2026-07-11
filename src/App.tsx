@@ -15,7 +15,7 @@ import { EmployeeRoster } from './components/EmployeeRoster';
 import { AuditTrail } from './components/AuditTrail';
 import { MobileFieldView } from './components/MobileFieldView';
 import { MarketingLanding } from './components/MarketingLanding';
-import { supabase } from './supabaseClient';
+import { supabase, updateSupabaseConfig } from './supabaseClient';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -62,9 +62,26 @@ function App() {
   const [permits, setPermits] = useState<any[]>([]);
   const [inspections, setInspections] = useState<any[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [supabaseReady, setSupabaseReady] = useState(false);
 
-  // Fetch Organizations on boot
+  // Fetch Organizations & config on boot
   useEffect(() => {
+    const initConfig = async () => {
+      try {
+        const configRes = await fetch(`${API_URL}/api/auth/config`);
+        if (configRes.ok) {
+          const config = await configRes.json();
+          updateSupabaseConfig(config.supabaseUrl, config.supabaseAnonKey);
+        }
+      } catch (err) {
+        console.error('Failed loading dynamic supabase credentials:', err);
+      } finally {
+        setSupabaseReady(true);
+      }
+    };
+
+    initConfig();
+
     fetch(`${API_URL}/api/organizations`)
       .then(res => {
         if (!res.ok) throw new Error('API server returned error status');
@@ -112,6 +129,8 @@ function App() {
 
   // Synchronize Supabase authentication state changes
   useEffect(() => {
+    if (!supabaseReady) return;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         resolveProfile(session.user.id, session.user.email || '');
@@ -128,7 +147,7 @@ function App() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabaseReady]);
 
   // Dynamically toggle body overflow scroll locks based on active viewMode
   useEffect(() => {
