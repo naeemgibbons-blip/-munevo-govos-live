@@ -550,9 +550,17 @@ app.get('/api/demo/requests', async (req, res) => {
 
 // 6.65. GET /api/auth/config: Expose Supabase connection credentials dynamically from backend environment
 app.get('/api/auth/config', (req, res) => {
+  let supabaseUrl = (process.env.VITE_SUPABASE_URL || '').trim();
+  if (supabaseUrl.startsWith('"') && supabaseUrl.endsWith('"')) supabaseUrl = supabaseUrl.slice(1, -1);
+  if (supabaseUrl.startsWith("'") && supabaseUrl.endsWith("'")) supabaseUrl = supabaseUrl.slice(1, -1);
+
+  let supabaseAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  if (supabaseAnonKey.startsWith('"') && supabaseAnonKey.endsWith('"')) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
+  if (supabaseAnonKey.startsWith("'") && supabaseAnonKey.endsWith("'")) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
+
   res.json({
-    supabaseUrl: process.env.VITE_SUPABASE_URL || 'https://ihwtaxltvsgfvgcgcpdw.supabase.co',
-    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || 'dummy-anon-key-placeholder'
+    supabaseUrl: supabaseUrl || 'https://ihwtaxltvsgfvgcgcpdw.supabase.co',
+    supabaseAnonKey: supabaseAnonKey || 'dummy-anon-key-placeholder'
   });
 });
 
