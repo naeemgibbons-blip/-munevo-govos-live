@@ -560,7 +560,12 @@ app.get('/api/auth/config', (req, res) => {
 app.get('/api/auth/bootstrap-status', async (req, res) => {
   try {
     const count = await prisma.profile.count({
-      where: { isGlobalAdmin: true }
+      where: { 
+        isGlobalAdmin: true,
+        NOT: {
+          email: 'global_admin@munevo.gov'
+        }
+      }
     });
     res.json({ hasGlobalAdmin: count > 0 });
   } catch (err: any) {
@@ -576,7 +581,12 @@ app.post('/api/auth/bootstrap', async (req, res) => {
   }
   try {
     const count = await prisma.profile.count({
-      where: { isGlobalAdmin: true }
+      where: { 
+        isGlobalAdmin: true,
+        NOT: {
+          email: 'global_admin@munevo.gov'
+        }
+      }
     });
     if (count > 0) {
       return res.status(403).json({ error: 'Platform already bootstrapped. Hijack blocked.' });
