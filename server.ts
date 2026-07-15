@@ -6,8 +6,14 @@ const prisma = new PrismaClient();
 const app = express();
 const PORT = 3001;
 
+let dbUser = 'undefined';
+if (process.env.DATABASE_URL) {
+  const match = process.env.DATABASE_URL.match(/postgresql:\/\/([^:]+)/);
+  if (match) dbUser = match[1];
+}
 console.log('[Startup] Backend environment diagnostics:', {
   DATABASE_URL_exists: !!process.env.DATABASE_URL,
+  DATABASE_URL_user: dbUser,
   DATABASE_URL_host: process.env.DATABASE_URL ? process.env.DATABASE_URL.split('@')[1] || 'no-host' : 'undefined',
   DIRECT_URL_exists: !!process.env.DIRECT_URL,
   VITE_SUPABASE_URL_exists: !!process.env.VITE_SUPABASE_URL,
