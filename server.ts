@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
-import { exec } from 'child_process';
 
 const CORRECT_DATABASE_URL = "postgresql://postgres.ihwtaxltvsgfvgcgcpdw:DYKYJHc1Apc1aGmn@aws-1-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true";
 const CORRECT_DIRECT_URL = "postgresql://postgres.ihwtaxltvsgfvgcgcpdw:DYKYJHc1Apc1aGmn@aws-1-us-west-2.pooler.supabase.com:5432/postgres";
@@ -599,32 +598,7 @@ app.get('/api/auth/config', (req, res) => {
   });
 });
 
-// Programmatic schema push and seed helper for production DB verification
-app.get('/api/auth/migrate', (req, res) => {
-  console.log('[Migration] Starting db push...');
-  const execOptions = {
-    env: {
-      ...process.env,
-      DATABASE_URL: process.env.DATABASE_URL,
-      DIRECT_URL: process.env.DIRECT_URL
-    }
-  };
-  exec('node node_modules/prisma/build/index.js db push --accept-data-loss', execOptions, (error, stdout, stderr) => {
-    if (error) {
-      console.error('[Migration] db push failed:', error);
-      return res.status(500).json({ error: error.message, stderr, stdout });
-    }
-    console.log('[Migration] db push succeeded. Starting seed...');
-    exec('node node_modules/prisma/build/index.js db seed', execOptions, (seedError, seedStdout, seedStderr) => {
-      if (seedError) {
-        console.error('[Migration] seed failed:', seedError);
-        return res.status(500).json({ error: seedError.message, seedStderr, seedStdout });
-      }
-      console.log('[Migration] seed succeeded.');
-      res.json({ message: 'Migration & Seeding successful!', dbPushStdout: stdout, seedStdout });
-    });
-  });
-});
+
 
 // 6.7. GET /api/auth/bootstrap-status: Check if any Global Admin profiles exist
 app.get('/api/auth/bootstrap-status', async (req, res) => {
