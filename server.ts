@@ -11,14 +11,25 @@ const correctDatabaseUrl = (url: string | undefined): string | undefined => {
   return url;
 };
 
+const correctedDbUrl = correctDatabaseUrl(process.env.DATABASE_URL);
 if (process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = correctDatabaseUrl(process.env.DATABASE_URL);
+  process.env.DATABASE_URL = correctedDbUrl;
 }
 if (process.env.DIRECT_URL) {
   process.env.DIRECT_URL = correctDatabaseUrl(process.env.DIRECT_URL);
 }
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient(
+  correctedDbUrl
+    ? {
+        datasources: {
+          db: {
+            url: correctedDbUrl
+          }
+        }
+      }
+    : undefined
+);
 const app = express();
 const PORT = 3001;
 
