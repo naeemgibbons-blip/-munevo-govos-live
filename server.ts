@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
+import { exec } from 'child_process';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -576,6 +577,26 @@ app.get('/api/auth/config', (req, res) => {
   res.json({
     supabaseUrl: supabaseUrl || 'https://ihwtaxltvsgfvgcgcpdw.supabase.co',
     supabaseAnonKey: supabaseAnonKey || 'dummy-anon-key-placeholder'
+  });
+});
+
+// Programmatic schema push and seed helper for production DB verification
+app.get('/api/auth/migrate', (req, res) => {
+  console.log('[Migration] Starting db push...');
+  exec('npx prisma db push --accept-data-loss', (error, stdout, stderr) => {
+    if (error) {
+      console.error('[Migration] db push failed:', error);
+      return res.status(500).json({ error: error.message, stderr, stdout });
+    }
+    console.log('[Migration] db push succeeded. Starting seed...');
+    exec('npx prisma db seed', (seedError, seedStdout, seedStderr) => {
+      if (seedError) {
+        console.error('[Migration] seed failed:', seedError);
+        return res.status(500).json({ error: seedError.message, seedStderr, seedStdout });
+      }
+      console.log('[Migration] seed succeeded.');
+      res.json({ message: 'Migration & Seeding successful!', dbPushStdout: stdout, seedStdout });
+    });
   });
 });
 
