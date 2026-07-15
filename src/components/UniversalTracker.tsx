@@ -35,7 +35,7 @@ export const UniversalTracker: React.FC<UniversalTrackerProps> = ({
   properties = {},
   currentOrgId = ''
 }) => {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3001' : '');
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');

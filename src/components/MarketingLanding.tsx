@@ -29,7 +29,7 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
   onEnterApp,
   addNotification
 }) => {
-  const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
+  const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3001' : '');
   const [demoLoading, setDemoLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'modules'>('home');
   const [activeModuleDetail, setActiveModuleDetail] = useState<string>('311');

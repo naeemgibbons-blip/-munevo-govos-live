@@ -22,7 +22,7 @@ export const MobileFieldView: React.FC<MobileFieldViewProps> = ({
   addNotification,
   onExit
 }) => {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3001' : '');
   const orgId = currentProfile?.organizationId || '';
   
   // List of simulated field inspections assigned to logged-in user

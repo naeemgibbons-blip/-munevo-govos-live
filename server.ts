@@ -6,6 +6,14 @@ const prisma = new PrismaClient();
 const app = express();
 const PORT = 3001;
 
+console.log('[Startup] Backend environment diagnostics:', {
+  DATABASE_URL_exists: !!process.env.DATABASE_URL,
+  DIRECT_URL_exists: !!process.env.DIRECT_URL,
+  VITE_SUPABASE_URL_exists: !!process.env.VITE_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY_exists: !!process.env.VITE_SUPABASE_ANON_KEY,
+  SUPABASE_SERVICE_ROLE_KEY_exists: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+});
+
 app.use(cors());
 app.use(express.json());
 

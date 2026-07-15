@@ -70,7 +70,7 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
 
   // Handle Badge Tap Login (Epic style session recovery simulation)
   const handleBadgeTap = async (roleName: 'mayor' | 'inspector' | 'resident') => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3001' : '');
     let badgeId = 'BADGE-EX-001'; // Matches mayor badgeId in seed.ts
     if (roleName === 'inspector') {
       badgeId = 'BADGE-IN-002'; // Matches inspector badgeId in seed.ts
