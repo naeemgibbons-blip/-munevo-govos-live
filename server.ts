@@ -584,11 +584,52 @@ app.get('/api/demo/requests', async (req, res) => {
 
 // 6.65. GET /api/auth/config: Expose Supabase connection credentials dynamically from backend environment
 app.get('/api/auth/config', (req, res) => {
-  let supabaseUrl = (process.env.VITE_SUPABASE_URL || '').trim();
+  const getPrefix = (val: string | undefined) => {
+    if (!val) return 'undefined';
+    const trimmed = val.trim();
+    if (trimmed.startsWith('eyJ')) return 'eyJ';
+    if (trimmed.startsWith('sb_publishable_')) return 'sb_publishable';
+    if (trimmed.startsWith('sb_secret_')) return 'sb_secret';
+    return trimmed.slice(0, 10) + '...';
+  };
+  const getHostname = (val: string | undefined) => {
+    if (!val) return 'undefined';
+    try {
+      const parsed = new URL(val);
+      return parsed.hostname;
+    } catch (e) {
+      return 'invalid-url';
+    }
+  };
+
+  console.log('[Auth Config Diagnostic] Env values status:', {
+    SUPABASE_URL: {
+      exists: !!process.env.SUPABASE_URL,
+      hostname: getHostname(process.env.SUPABASE_URL)
+    },
+    SUPABASE_ANON_KEY: {
+      exists: !!process.env.SUPABASE_ANON_KEY,
+      prefix: getPrefix(process.env.SUPABASE_ANON_KEY)
+    },
+    VITE_SUPABASE_URL: {
+      exists: !!process.env.VITE_SUPABASE_URL,
+      hostname: getHostname(process.env.VITE_SUPABASE_URL)
+    },
+    VITE_SUPABASE_ANON_KEY: {
+      exists: !!process.env.VITE_SUPABASE_ANON_KEY,
+      prefix: getPrefix(process.env.VITE_SUPABASE_ANON_KEY)
+    },
+    SUPABASE_SERVICE_ROLE_KEY: {
+      exists: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      prefix: getPrefix(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    }
+  });
+
+  let supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
   if (supabaseUrl.startsWith('"') && supabaseUrl.endsWith('"')) supabaseUrl = supabaseUrl.slice(1, -1);
   if (supabaseUrl.startsWith("'") && supabaseUrl.endsWith("'")) supabaseUrl = supabaseUrl.slice(1, -1);
 
-  let supabaseAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  let supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
   if (supabaseAnonKey.startsWith('"') && supabaseAnonKey.endsWith('"')) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
   if (supabaseAnonKey.startsWith("'") && supabaseAnonKey.endsWith("'")) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
 
