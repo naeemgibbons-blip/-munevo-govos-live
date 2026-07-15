@@ -2,6 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 
+const originalEnv = {
+  DATABASE_URL: process.env.DATABASE_URL,
+  DIRECT_URL: process.env.DIRECT_URL,
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+  VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY
+};
+
 const CORRECT_DATABASE_URL = "postgresql://postgres.ihwtaxltvsgfvgcgcpdw:DYKYJHc1Apc1aGmn@aws-1-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true";
 const CORRECT_DIRECT_URL = "postgresql://postgres.ihwtaxltvsgfvgcgcpdw:DYKYJHc1Apc1aGmn@aws-1-us-west-2.pooler.supabase.com:5432/postgres";
 
@@ -603,25 +613,33 @@ app.get('/api/auth/config', (req, res) => {
   };
 
   console.log('[Auth Config Diagnostic] Env values status:', {
+    DATABASE_URL: {
+      exists: !!originalEnv.DATABASE_URL,
+      hostname: originalEnv.DATABASE_URL ? (originalEnv.DATABASE_URL.includes('@') ? originalEnv.DATABASE_URL.split('@')[1] : 'no-host') : 'undefined'
+    },
+    DIRECT_URL: {
+      exists: !!originalEnv.DIRECT_URL,
+      hostname: originalEnv.DIRECT_URL ? (originalEnv.DIRECT_URL.includes('@') ? originalEnv.DIRECT_URL.split('@')[1] : 'no-host') : 'undefined'
+    },
     SUPABASE_URL: {
-      exists: !!process.env.SUPABASE_URL,
-      hostname: getHostname(process.env.SUPABASE_URL)
+      exists: !!originalEnv.SUPABASE_URL,
+      hostname: getHostname(originalEnv.SUPABASE_URL)
     },
     SUPABASE_ANON_KEY: {
-      exists: !!process.env.SUPABASE_ANON_KEY,
-      prefix: getPrefix(process.env.SUPABASE_ANON_KEY)
+      exists: !!originalEnv.SUPABASE_ANON_KEY,
+      prefix: getPrefix(originalEnv.SUPABASE_ANON_KEY)
     },
     VITE_SUPABASE_URL: {
-      exists: !!process.env.VITE_SUPABASE_URL,
-      hostname: getHostname(process.env.VITE_SUPABASE_URL)
+      exists: !!originalEnv.VITE_SUPABASE_URL,
+      hostname: getHostname(originalEnv.VITE_SUPABASE_URL)
     },
     VITE_SUPABASE_ANON_KEY: {
-      exists: !!process.env.VITE_SUPABASE_ANON_KEY,
-      prefix: getPrefix(process.env.VITE_SUPABASE_ANON_KEY)
+      exists: !!originalEnv.VITE_SUPABASE_ANON_KEY,
+      prefix: getPrefix(originalEnv.VITE_SUPABASE_ANON_KEY)
     },
     SUPABASE_SERVICE_ROLE_KEY: {
-      exists: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      prefix: getPrefix(process.env.SUPABASE_SERVICE_ROLE_KEY)
+      exists: !!originalEnv.SUPABASE_SERVICE_ROLE_KEY,
+      prefix: getPrefix(originalEnv.SUPABASE_SERVICE_ROLE_KEY)
     }
   });
 
