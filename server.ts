@@ -583,13 +583,13 @@ app.get('/api/auth/config', (req, res) => {
 // Programmatic schema push and seed helper for production DB verification
 app.get('/api/auth/migrate', (req, res) => {
   console.log('[Migration] Starting db push...');
-  exec('npx prisma db push --accept-data-loss', (error, stdout, stderr) => {
+  exec('node node_modules/prisma/build/index.js db push --accept-data-loss', (error, stdout, stderr) => {
     if (error) {
       console.error('[Migration] db push failed:', error);
       return res.status(500).json({ error: error.message, stderr, stdout });
     }
     console.log('[Migration] db push succeeded. Starting seed...');
-    exec('npx prisma db seed', (seedError, seedStdout, seedStderr) => {
+    exec('node node_modules/prisma/build/index.js db seed', (seedError, seedStdout, seedStderr) => {
       if (seedError) {
         console.error('[Migration] seed failed:', seedError);
         return res.status(500).json({ error: seedError.message, seedStderr, seedStdout });
