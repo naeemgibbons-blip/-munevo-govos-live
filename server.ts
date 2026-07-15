@@ -3,33 +3,19 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
 
-const correctDatabaseUrl = (url: string | undefined): string | undefined => {
-  if (!url) return url;
-  if (url.includes('://postgres:')) {
-    return url.replace('://postgres:', '://postgres.ihwtaxltvsgfvgcgcpdw:');
+const CORRECT_DATABASE_URL = "postgresql://postgres.ihwtaxltvsgfvgcgcpdw:DYKYJHc1Apc1aGmn@aws-1-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true";
+const CORRECT_DIRECT_URL = "postgresql://postgres.ihwtaxltvsgfvgcgcpdw:DYKYJHc1Apc1aGmn@aws-1-us-west-2.pooler.supabase.com:5432/postgres";
+
+process.env.DATABASE_URL = CORRECT_DATABASE_URL;
+process.env.DIRECT_URL = CORRECT_DIRECT_URL;
+
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: CORRECT_DATABASE_URL
+    }
   }
-  return url;
-};
-
-const correctedDbUrl = correctDatabaseUrl(process.env.DATABASE_URL);
-if (process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = correctedDbUrl;
-}
-if (process.env.DIRECT_URL) {
-  process.env.DIRECT_URL = correctDatabaseUrl(process.env.DIRECT_URL);
-}
-
-const prisma = new PrismaClient(
-  correctedDbUrl
-    ? {
-        datasources: {
-          db: {
-            url: correctedDbUrl
-          }
-        }
-      }
-    : undefined
-);
+});
 const app = express();
 const PORT = 3001;
 
@@ -619,8 +605,8 @@ app.get('/api/auth/migrate', (req, res) => {
   const execOptions = {
     env: {
       ...process.env,
-      DATABASE_URL: correctedDbUrl,
-      DIRECT_URL: correctDatabaseUrl(process.env.DIRECT_URL)
+      DATABASE_URL: process.env.DATABASE_URL,
+      DIRECT_URL: process.env.DIRECT_URL
     }
   };
   exec('node node_modules/prisma/build/index.js db push --accept-data-loss', execOptions, (error, stdout, stderr) => {
