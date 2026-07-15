@@ -27,6 +27,13 @@ if (process.env.DATABASE_URL) {
   const match = process.env.DATABASE_URL.match(/postgresql:\/\/([^:]+)/);
   if (match) dbUser = match[1];
 }
+const obfuscateUrl = (url: string | undefined) => {
+  if (!url) return 'undefined';
+  return url.replace(/:([^@]+)@/, ':****@');
+};
+console.log('[Startup] Obfuscated DATABASE_URL:', obfuscateUrl(process.env.DATABASE_URL));
+console.log('[Startup] Obfuscated DIRECT_URL:', obfuscateUrl(process.env.DIRECT_URL));
+
 console.log('[Startup] Backend environment diagnostics:', {
   DATABASE_URL_exists: !!process.env.DATABASE_URL,
   DATABASE_URL_user: dbUser,
