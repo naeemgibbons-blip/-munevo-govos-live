@@ -3,6 +3,21 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
 
+const correctDatabaseUrl = (url: string | undefined): string | undefined => {
+  if (!url) return url;
+  if (url.includes('://postgres:')) {
+    return url.replace('://postgres:', '://postgres.ihwtaxltvsgfvgcgcpdw:');
+  }
+  return url;
+};
+
+if (process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = correctDatabaseUrl(process.env.DATABASE_URL);
+}
+if (process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = correctDatabaseUrl(process.env.DIRECT_URL);
+}
+
 const prisma = new PrismaClient();
 const app = express();
 const PORT = 3001;
