@@ -662,9 +662,9 @@ app.get('/api/auth/config', (req, res) => {
   if (supabaseAnonKey.startsWith('"') && supabaseAnonKey.endsWith('"')) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
   if (supabaseAnonKey.startsWith("'") && supabaseAnonKey.endsWith("'")) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
 
-  let resolvedUrl = supabaseUrl;
+  let resolvedUrl = '';
   let debugError = '';
-  if (!resolvedUrl && supabaseAnonKey.includes('.')) {
+  if (supabaseAnonKey.includes('.')) {
     try {
       const payloadSegment = supabaseAnonKey.split('.')[1];
       const base64 = payloadSegment.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - payloadSegment.length % 4) % 4);
@@ -678,7 +678,7 @@ app.get('/api/auth/config', (req, res) => {
     }
   }
   if (!resolvedUrl) {
-    resolvedUrl = 'https://ihwtaxltvsgfvgcgcpdw.supabase.co';
+    resolvedUrl = supabaseUrl || 'https://ihwtaxltvsgfvgcgcpdw.supabase.co';
   }
 
   res.json({
