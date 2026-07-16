@@ -593,67 +593,33 @@ app.get('/api/demo/requests', async (req, res) => {
   }
 });
 
-// 6.65. GET /api/auth/config: Expose Supabase connection credentials dynamically from backend environment
-app.get('/api/auth/config', (req, res) => {
-  const getPrefix = (val: string | undefined) => {
-    if (!val) return 'undefined';
-    const trimmed = val.trim();
-    if (trimmed.startsWith('eyJ')) return 'eyJ';
-    if (trimmed.startsWith('sb_publishable_')) return 'sb_publishable';
-    if (trimmed.startsWith('sb_secret_')) return 'sb_secret';
-    return trimmed.slice(0, 10) + '...';
+const getPrefix = (val: string | undefined) => {
+  if (!val) return 'undefined';
+  const trimmed = val.trim();
+  if (trimmed.startsWith('eyJ')) return 'eyJ';
+  if (trimmed.startsWith('sb_publishable_')) return 'sb_publishable';
+  if (trimmed.startsWith('sb_secret_')) return 'sb_secret';
+  return trimmed.slice(0, 10) + '...';
+};
+const getHostname = (val: string | undefined) => {
+  if (!val) return 'undefined';
+  try {
+    const parsed = new URL(val);
+    return parsed.hostname;
+  } catch (e) {
+    return 'invalid-url';
+  }
+};
+const getDbDetails = (url: string | undefined) => {
+  if (!url) return 'undefined';
+  const match = url.match(/postgresql:\/\/([^:]+):([^@]+)@/);
+  if (!match) return 'invalid-format';
+  return {
+    username: match[1],
+    passwordLength: match[2].length,
+    passwordPrefix: match[2].slice(0, 3)
   };
-  const getHostname = (val: string | undefined) => {
-    if (!val) return 'undefined';
-    try {
-      const parsed = new URL(val);
-      return parsed.hostname;
-    } catch (e) {
-      return 'invalid-url';
-    }
-  };
-
-  const getDbDetails = (url: string | undefined) => {
-    if (!url) return 'undefined';
-    const match = url.match(/postgresql:\/\/([^:]+):([^@]+)@/);
-    if (!match) return 'invalid-format';
-    return {
-      username: match[1],
-      passwordLength: match[2].length,
-      passwordPrefix: match[2].slice(0, 3)
-    };
-  };
-
-  console.log('[Auth Config Diagnostic] Env values status:', {
-    DATABASE_URL: {
-      exists: !!originalEnv.DATABASE_URL,
-      details: getDbDetails(originalEnv.DATABASE_URL)
-    },
-    DIRECT_URL: {
-      exists: !!originalEnv.DIRECT_URL,
-      details: getDbDetails(originalEnv.DIRECT_URL)
-    },
-    SUPABASE_URL: {
-      exists: !!originalEnv.SUPABASE_URL,
-      hostname: getHostname(originalEnv.SUPABASE_URL)
-    },
-    SUPABASE_ANON_KEY: {
-      exists: !!originalEnv.SUPABASE_ANON_KEY,
-      prefix: getPrefix(originalEnv.SUPABASE_ANON_KEY)
-    },
-    VITE_SUPABASE_URL: {
-      exists: !!originalEnv.VITE_SUPABASE_URL,
-      hostname: getHostname(originalEnv.VITE_SUPABASE_URL)
-    },
-    VITE_SUPABASE_ANON_KEY: {
-      exists: !!originalEnv.VITE_SUPABASE_ANON_KEY,
-      prefix: getPrefix(originalEnv.VITE_SUPABASE_ANON_KEY)
-    },
-    SUPABASE_SERVICE_ROLE_KEY: {
-      exists: !!originalEnv.SUPABASE_SERVICE_ROLE_KEY,
-      prefix: getPrefix(originalEnv.SUPABASE_SERVICE_ROLE_KEY)
-    }
-  });
+};
 
 function getResolvedSupabaseUrl(): { url: string; err: string } {
   let supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
@@ -684,7 +650,39 @@ function getResolvedSupabaseUrl(): { url: string; err: string } {
   return { url: resolvedUrl, err: debugError };
 }
 
+// 6.65. GET /api/auth/config: Expose Supabase connection credentials dynamically from backend environment
 app.get('/api/auth/config', (req, res) => {
+  console.log('[Auth Config Diagnostic] Env values status:', {
+    DATABASE_URL: {
+      exists: !!originalEnv.DATABASE_URL,
+      details: getDbDetails(originalEnv.DATABASE_URL)
+    },
+    DIRECT_URL: {
+      exists: !!originalEnv.DIRECT_URL,
+      details: getDbDetails(originalEnv.DIRECT_URL)
+    },
+    SUPABASE_URL: {
+      exists: !!originalEnv.SUPABASE_URL,
+      hostname: getHostname(originalEnv.SUPABASE_URL)
+    },
+    VITE_SUPABASE_URL: {
+      exists: !!originalEnv.VITE_SUPABASE_URL,
+      hostname: getHostname(originalEnv.VITE_SUPABASE_URL)
+    },
+    SUPABASE_ANON_KEY: {
+      exists: !!originalEnv.SUPABASE_ANON_KEY,
+      prefix: getPrefix(originalEnv.SUPABASE_ANON_KEY)
+    },
+    VITE_SUPABASE_ANON_KEY: {
+      exists: !!originalEnv.VITE_SUPABASE_ANON_KEY,
+      prefix: getPrefix(originalEnv.VITE_SUPABASE_ANON_KEY)
+    },
+    SUPABASE_SERVICE_ROLE_KEY: {
+      exists: !!originalEnv.SUPABASE_SERVICE_ROLE_KEY,
+      prefix: getPrefix(originalEnv.SUPABASE_SERVICE_ROLE_KEY)
+    }
+  });
+
   let supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
   if (supabaseAnonKey.startsWith('"') && supabaseAnonKey.endsWith('"')) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
   if (supabaseAnonKey.startsWith("'") && supabaseAnonKey.endsWith("'")) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
