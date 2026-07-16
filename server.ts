@@ -690,6 +690,7 @@ app.get('/api/auth/config', (req, res) => {
   const { url: resolvedUrl, err: debugError } = getResolvedSupabaseUrl();
 
   res.json({
+    version: "confirm-naeem-v1",
     supabaseUrl: resolvedUrl,
     supabaseAnonKey: supabaseAnonKey || 'dummy-anon-key-placeholder',
     debug: {
@@ -698,6 +699,7 @@ app.get('/api/auth/config', (req, res) => {
       bufferExists: typeof Buffer === 'function',
       error: debugError
     }
+  });
 });
 
 app.get('/api/auth/confirm-naeem', async (req, res) => {
