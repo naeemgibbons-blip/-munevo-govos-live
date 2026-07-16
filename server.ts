@@ -662,9 +662,34 @@ app.get('/api/auth/config', (req, res) => {
   if (supabaseAnonKey.startsWith('"') && supabaseAnonKey.endsWith('"')) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
   if (supabaseAnonKey.startsWith("'") && supabaseAnonKey.endsWith("'")) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
 
+  let resolvedUrl = supabaseUrl;
+  let debugError = '';
+  if (!resolvedUrl && supabaseAnonKey.includes('.')) {
+    try {
+      const payloadSegment = supabaseAnonKey.split('.')[1];
+      const base64 = payloadSegment.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - payloadSegment.length % 4) % 4);
+      const payload = JSON.parse(atob(base64));
+      if (payload && payload.ref) {
+        resolvedUrl = `https://${payload.ref}.supabase.co`;
+      }
+    } catch (err: any) {
+      debugError = err.message || String(err);
+      console.error('Failed to parse JWT for project ref:', err);
+    }
+  }
+  if (!resolvedUrl) {
+    resolvedUrl = 'https://ihwtaxltvsgfvgcgcpdw.supabase.co';
+  }
+
   res.json({
-    supabaseUrl: supabaseUrl || 'https://ihwtaxltvsgfvgcgcpdw.supabase.co',
-    supabaseAnonKey: supabaseAnonKey || 'dummy-anon-key-placeholder'
+    supabaseUrl: resolvedUrl,
+    supabaseAnonKey: supabaseAnonKey || 'dummy-anon-key-placeholder',
+    debug: {
+      rawUrl: supabaseUrl,
+      atobExists: typeof atob === 'function',
+      bufferExists: typeof Buffer === 'function',
+      error: debugError
+    }
   });
 });
 
@@ -705,8 +730,28 @@ app.post('/api/auth/bootstrap', async (req, res) => {
     if (count > 0) {
       return res.status(403).json({ error: 'Platform already bootstrapped. Hijack blocked.' });
     }
-    const profile = await prisma.profile.create({
-      data: {
+
+    // Direct insert into auth.users to satisfy database foreign key constraints
+    try {
+      const existingAuthUsers: any[] = await prisma.$queryRawUnsafe('SELECT id FROM auth.users WHERE id = $1::uuid', userId);
+      if (existingAuthUsers.length === 0) {
+        await prisma.$executeRawUnsafe(`
+          INSERT INTO auth.users (id, email, raw_user_meta_data, raw_app_meta_data, aud, role, created_at, updated_at)
+          VALUES ($1::uuid, $2, '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW())
+        `, userId, email);
+        console.log(`Programmatically provisioned auth placeholder for user ${email} (ID: ${userId})`);
+      }
+    } catch (dbErr: any) {
+      console.warn('Direct auth.users placeholder provision failed/bypassed:', dbErr.message || dbErr);
+    }
+
+    const profile = await prisma.profile.upsert({
+      where: { id: userId },
+      update: {
+        isGlobalAdmin: true,
+        email
+      },
+      create: {
         id: userId,
         email,
         isGlobalAdmin: true,
