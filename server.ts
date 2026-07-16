@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
 
 const originalEnv = {
   DATABASE_URL: process.env.DATABASE_URL,
@@ -654,6 +655,7 @@ app.get('/api/auth/config', (req, res) => {
     }
   });
 
+function getResolvedSupabaseUrl(): { url: string; err: string } {
   let supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
   if (supabaseUrl.startsWith('"') && supabaseUrl.endsWith('"')) supabaseUrl = supabaseUrl.slice(1, -1);
   if (supabaseUrl.startsWith("'") && supabaseUrl.endsWith("'")) supabaseUrl = supabaseUrl.slice(1, -1);
@@ -674,18 +676,26 @@ app.get('/api/auth/config', (req, res) => {
       }
     } catch (err: any) {
       debugError = err.message || String(err);
-      console.error('Failed to parse JWT for project ref:', err);
     }
   }
   if (!resolvedUrl) {
     resolvedUrl = supabaseUrl || 'https://ihwtaxltvsgfvgcgcpdw.supabase.co';
   }
+  return { url: resolvedUrl, err: debugError };
+}
+
+app.get('/api/auth/config', (req, res) => {
+  let supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  if (supabaseAnonKey.startsWith('"') && supabaseAnonKey.endsWith('"')) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
+  if (supabaseAnonKey.startsWith("'") && supabaseAnonKey.endsWith("'")) supabaseAnonKey = supabaseAnonKey.slice(1, -1);
+
+  const { url: resolvedUrl, err: debugError } = getResolvedSupabaseUrl();
 
   res.json({
     supabaseUrl: resolvedUrl,
     supabaseAnonKey: supabaseAnonKey || 'dummy-anon-key-placeholder',
     debug: {
-      rawUrl: supabaseUrl,
+      rawUrl: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim(),
       atobExists: typeof atob === 'function',
       bufferExists: typeof Buffer === 'function',
       error: debugError
@@ -714,9 +724,9 @@ app.get('/api/auth/bootstrap-status', async (req, res) => {
 
 // 6.8. POST /api/auth/bootstrap: Provision the first Global Admin profile securely
 app.post('/api/auth/bootstrap', async (req, res) => {
-  const { userId, email } = req.body;
-  if (!userId || !email) {
-    return res.status(400).json({ error: 'userId and email are required.' });
+  let { userId, email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'email is required.' });
   }
   try {
     const count = await prisma.profile.count({
@@ -731,28 +741,117 @@ app.post('/api/auth/bootstrap', async (req, res) => {
       return res.status(403).json({ error: 'Platform already bootstrapped. Hijack blocked.' });
     }
 
-    // Direct insert into auth.users to satisfy database foreign key constraints
+    let targetUserId = userId;
+    let userFoundInAuth = false;
+
+    // 1. Try to find the user in auth.users by email to get their real ID if they already exist
     try {
-      const existingAuthUsers: any[] = await prisma.$queryRawUnsafe('SELECT id FROM auth.users WHERE id = $1::uuid', userId);
+      const existingAuthUsers: any[] = await prisma.$queryRawUnsafe('SELECT id FROM auth.users WHERE email = $1', email);
+      if (existingAuthUsers.length > 0) {
+        targetUserId = existingAuthUsers[0].id;
+        userFoundInAuth = true;
+        console.log(`Found existing auth user for email ${email} with ID ${targetUserId}`);
+      }
+    } catch (dbErr: any) {
+      console.warn('Failed to query existing user by email in auth.users:', dbErr.message || dbErr);
+    }
+
+    // 2. Suppress/confirm or create via Supabase Admin API
+    const { url: resolvedUrl } = getResolvedSupabaseUrl();
+    const supabaseServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+    if (supabaseServiceRoleKey) {
+      try {
+        const adminClient = createClient(resolvedUrl, supabaseServiceRoleKey, {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        });
+
+        if (userFoundInAuth && targetUserId) {
+          // Confirm existing
+          console.log(`Confirming existing user ${email} via Admin API...`);
+          const { error: updateErr } = await adminClient.auth.admin.updateUserById(targetUserId, {
+            email_confirm: true
+          });
+          if (updateErr) {
+            console.warn('Admin API email confirmation failed:', updateErr.message);
+          } else {
+            console.log(`Successfully confirmed email for existing admin user ${email} (ID: ${targetUserId})`);
+          }
+        } else {
+          // Check if exists in Supabase Auth first but not db yet
+          let supabaseUser: any = null;
+          try {
+            const { data: listData, error: listErr } = await adminClient.auth.admin.listUsers();
+            if (!listErr && listData && listData.users) {
+              supabaseUser = listData.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+            }
+          } catch (listErr: any) {
+            console.warn('Failed to search user list via Admin API:', listErr.message || listErr);
+          }
+
+          if (supabaseUser) {
+            targetUserId = supabaseUser.id;
+            console.log(`Found user ${email} in Supabase Auth (but not DB). Confirming email...`);
+            const { error: updateErr } = await adminClient.auth.admin.updateUserById(targetUserId, {
+              email_confirm: true
+            });
+            if (updateErr) {
+              console.warn('Admin API email confirmation failed:', updateErr.message);
+            }
+          } else {
+            // Create user
+            const tempPassword = 'Password123!';
+            console.log(`Creating user ${email} via Admin API...`);
+            const { data: createData, error: createErr } = await adminClient.auth.admin.createUser({
+              email,
+              password: tempPassword,
+              email_confirm: true
+            });
+            if (createErr) {
+              console.error('Admin API createUser failed:', createErr.message);
+              throw createErr;
+            }
+            if (createData?.user) {
+              targetUserId = createData.user.id;
+              console.log(`Created admin user successfully via Admin API. ID: ${targetUserId}`);
+            }
+          }
+        }
+      } catch (adminErr: any) {
+        console.error('Failed to confirm/create user via Supabase Admin API:', adminErr.message || adminErr);
+      }
+    } else {
+      console.warn('SUPABASE_SERVICE_ROLE_KEY is not defined. Admin confirmation bypassed.');
+    }
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Could not resolve or create userId.' });
+    }
+
+    // 3. Direct insert into auth.users to satisfy database foreign key constraints
+    try {
+      const existingAuthUsers: any[] = await prisma.$queryRawUnsafe('SELECT id FROM auth.users WHERE id = $1::uuid', targetUserId);
       if (existingAuthUsers.length === 0) {
         await prisma.$executeRawUnsafe(`
           INSERT INTO auth.users (id, email, raw_user_meta_data, raw_app_meta_data, aud, role, created_at, updated_at)
           VALUES ($1::uuid, $2, '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW())
-        `, userId, email);
-        console.log(`Programmatically provisioned auth placeholder for user ${email} (ID: ${userId})`);
+        `, targetUserId, email);
+        console.log(`Programmatically provisioned auth placeholder for user ${email} (ID: ${targetUserId})`);
       }
     } catch (dbErr: any) {
       console.warn('Direct auth.users placeholder provision failed/bypassed:', dbErr.message || dbErr);
     }
 
     const profile = await prisma.profile.upsert({
-      where: { id: userId },
+      where: { id: targetUserId },
       update: {
         isGlobalAdmin: true,
         email
       },
       create: {
-        id: userId,
+        id: targetUserId,
         email,
         isGlobalAdmin: true,
         isOrgAdmin: false,
