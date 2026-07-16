@@ -690,17 +690,8 @@ app.get('/api/auth/config', (req, res) => {
   const { url: resolvedUrl, err: debugError } = getResolvedSupabaseUrl();
 
   res.json({
-    version: "confirm-naeem-v2",
     supabaseUrl: resolvedUrl,
     supabaseAnonKey: supabaseAnonKey || 'dummy-anon-key-placeholder',
-    envStatus: {
-      SUPABASE_SERVICE_ROLE_KEY_exists: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      SUPABASE_SERVICE_ROLE_KEY_prefix: getPrefix(process.env.SUPABASE_SERVICE_ROLE_KEY),
-      SUPABASE_SERVICE_KEY_exists: !!process.env.SUPABASE_SERVICE_KEY,
-      SUPABASE_SERVICE_KEY_prefix: getPrefix(process.env.SUPABASE_SERVICE_KEY),
-      SERVICE_ROLE_KEY_exists: !!process.env.SERVICE_ROLE_KEY,
-      SERVICE_ROLE_KEY_prefix: getPrefix(process.env.SERVICE_ROLE_KEY)
-    },
     debug: {
       rawUrl: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim(),
       atobExists: typeof atob === 'function',
@@ -708,84 +699,6 @@ app.get('/api/auth/config', (req, res) => {
       error: debugError
     }
   });
-});
-
-app.get('/api/auth/confirm-naeem', async (req, res) => {
-  const { url: resolvedUrl } = getResolvedSupabaseUrl();
-  const supabaseServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  if (!supabaseServiceRoleKey) {
-    return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY not configured on server.' });
-  }
-  try {
-    const adminClient = createClient(resolvedUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
-    const userId = "4216415d-14e9-4404-a54e-090c878b1479";
-    
-    console.log(`Updating user ${userId} in production Supabase Auth...`);
-    const { data: updateData, error: updateErr } = await adminClient.auth.admin.updateUserById(userId, {
-      email_confirm: true
-    });
-    
-    if (updateErr) {
-      return res.status(500).json({ error: updateErr.message });
-    }
-    
-    console.log(`Fetching user ${userId} to verify confirmation timestamps...`);
-    const { data: getUserData, error: getErr } = await adminClient.auth.admin.getUserById(userId);
-    
-    if (getErr) {
-      return res.status(500).json({ error: getErr.message, step: 'getUserById' });
-    }
-    
-    res.json({
-      message: 'Successfully updated and verified.',
-      user: {
-        id: getUserData.user?.id,
-        email: getUserData.user?.email,
-        email_confirmed_at: getUserData.user?.email_confirmed_at,
-        confirmed_at: getUserData.user?.confirmed_at
-      }
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/auth/list-users', async (req, res) => {
-  const { url: resolvedUrl } = getResolvedSupabaseUrl();
-  const supabaseServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  if (!supabaseServiceRoleKey) {
-    return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY not configured on server.' });
-  }
-  try {
-    const adminClient = createClient(resolvedUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-    console.log('Listing users via Admin API...');
-    const { data, error } = await adminClient.auth.admin.listUsers();
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-    res.json({
-      url: resolvedUrl,
-      users: data.users.map((u: any) => ({
-        id: u.id,
-        email: u.email,
-        email_confirmed_at: u.email_confirmed_at,
-        confirmed_at: u.confirmed_at
-      }))
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // 6.7. GET /api/auth/bootstrap-status: Check if any Global Admin profiles exist
