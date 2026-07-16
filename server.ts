@@ -612,14 +612,25 @@ app.get('/api/auth/config', (req, res) => {
     }
   };
 
+  const getDbDetails = (url: string | undefined) => {
+    if (!url) return 'undefined';
+    const match = url.match(/postgresql:\/\/([^:]+):([^@]+)@/);
+    if (!match) return 'invalid-format';
+    return {
+      username: match[1],
+      passwordLength: match[2].length,
+      passwordPrefix: match[2].slice(0, 3)
+    };
+  };
+
   console.log('[Auth Config Diagnostic] Env values status:', {
     DATABASE_URL: {
       exists: !!originalEnv.DATABASE_URL,
-      hostname: originalEnv.DATABASE_URL ? (originalEnv.DATABASE_URL.includes('@') ? originalEnv.DATABASE_URL.split('@')[1] : 'no-host') : 'undefined'
+      details: getDbDetails(originalEnv.DATABASE_URL)
     },
     DIRECT_URL: {
       exists: !!originalEnv.DIRECT_URL,
-      hostname: originalEnv.DIRECT_URL ? (originalEnv.DIRECT_URL.includes('@') ? originalEnv.DIRECT_URL.split('@')[1] : 'no-host') : 'undefined'
+      details: getDbDetails(originalEnv.DIRECT_URL)
     },
     SUPABASE_URL: {
       exists: !!originalEnv.SUPABASE_URL,
