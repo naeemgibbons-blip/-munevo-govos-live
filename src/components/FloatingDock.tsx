@@ -7,13 +7,13 @@ import {
   Plus, 
   Bell, 
   Sliders, 
-  Layers, 
-  Sparkles,
-  Network
+  ClipboardList,
+  LayoutGrid
 } from 'lucide-react';
 
 interface FloatingDockProps {
   onGoHome: () => void;
+  onGoCommandCenter: () => void;
   onOpenSearch: () => void;
   onOpenAI: () => void;
   onOpenGIS: () => void;
@@ -21,26 +21,30 @@ interface FloatingDockProps {
   onOpenNotifications: () => void;
   onOpenControlCenter: () => void;
   activeModule: string;
+  viewMode: string;
 }
 
 export const FloatingDock: React.FC<FloatingDockProps> = ({
   onGoHome,
+  onGoCommandCenter,
   onOpenSearch,
   onOpenAI,
   onOpenGIS,
   onOpenCreate,
   onOpenNotifications,
   onOpenControlCenter,
-  activeModule
+  activeModule,
+  viewMode
 }) => {
   const dockItems = [
-    { id: 'home', label: 'Command Home', icon: Home, action: onGoHome, isActive: activeModule === 'command-center' },
-    { id: 'search', label: 'Search (Cmd+K)', icon: Search, action: onOpenSearch, isActive: false },
-    { id: 'ai', label: 'Sentinel AI', icon: Brain, action: onOpenAI, isActive: false, isAccent: true },
-    { id: 'gis', label: 'GIS Spatial Map', icon: Map, action: onOpenGIS, isActive: activeModule === 'gis' },
-    { id: 'create', label: 'Global Create', icon: Plus, action: onOpenCreate, isActive: false, isPrimary: true },
-    { id: 'notifications', label: 'Notifications', icon: Bell, action: onOpenNotifications, isActive: false },
-    { id: 'control', label: 'Control Center', icon: Sliders, action: onOpenControlCenter, isActive: activeModule === 'platform-control' }
+    { id: 'home', label: 'Workspace Launcher (Home)', icon: LayoutGrid, action: onGoHome, isActive: viewMode === 'workspace-home' },
+    { id: 'command', label: 'Command Center (Operations)', icon: ClipboardList, action: onGoCommandCenter, isActive: viewMode === 'module' && activeModule === 'command-center' },
+    { id: 'search', label: 'Universal Search (Ctrl+K)', icon: Search, action: onOpenSearch, isActive: false },
+    { id: 'ai', label: 'Sentinel AI Assistant', icon: Brain, action: onOpenAI, isActive: false, isAccent: true },
+    { id: 'gis', label: 'GIS Spatial Map', icon: Map, action: onOpenGIS, isActive: viewMode === 'module' && activeModule === 'gis' },
+    { id: 'create', label: 'Global Create Record', icon: Plus, action: onOpenCreate, isActive: false, isPrimary: true },
+    { id: 'notifications', label: 'Notifications Drawer', icon: Bell, action: onOpenNotifications, isActive: false },
+    { id: 'control', label: 'Control Center', icon: Sliders, action: onOpenControlCenter, isActive: viewMode === 'module' && activeModule === 'platform-control' }
   ];
 
   return (
@@ -69,7 +73,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
         style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '3px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', marginRight: '4px' }}
       >
         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} className="pulse-emerald" />
-        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#10b981' }}>NW-CLOUD</span>
+        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#10b981' }}>MUNEVO OS</span>
       </div>
       {dockItems.map(item => {
         const IconComp = item.icon;
@@ -87,7 +91,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
                 : item.isAccent 
                 ? 'rgba(139, 92, 246, 0.2)' 
                 : item.isActive 
-                ? 'rgba(255, 255, 255, 0.15)' 
+                ? 'rgba(255, 255, 255, 0.18)' 
                 : 'transparent',
               border: item.isPrimary 
                 ? 'none' 

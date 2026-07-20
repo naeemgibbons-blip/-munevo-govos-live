@@ -14,13 +14,13 @@ import {
 } from '../mockData';
 import { 
   Sparkles, 
-  CheckCircle, 
+  CheckCircle2, 
   AlertTriangle, 
   Clock, 
   TrendingUp, 
   Send, 
   DollarSign, 
-  Building,
+  Building2,
   User,
   UserPlus,
   Plus,
@@ -32,13 +32,31 @@ import {
   Users,
   ShieldCheck,
   Check,
-  X
+  X,
+  MapPin,
+  Activity,
+  Brain,
+  ShieldAlert,
+  Wrench,
+  ChevronRight,
+  Layers,
+  Map as MapIcon,
+  Sun,
+  AlertCircle,
+  FileCheck,
+  Flame,
+  PieChart,
+  BarChart3,
+  HardHat,
+  Scale,
+  Pin
 } from 'lucide-react';
+import { WORKSPACE_CATALOG } from './WorkspaceHome';
 
 interface CommandCenterProps {
   currentRole: UserRole;
   currentProfile: any;
-  onOpenChart: (type: 'property' | 'permit' | 'legislative' | 'business', id: string) => void;
+  onOpenChart: (type: 'property' | 'permit' | 'legislative' | 'business' | 'project', id: string) => void;
   trackerItems: TrackerItem[];
   setTrackerItems: React.Dispatch<React.SetStateAction<TrackerItem[]>>;
   addNotification: (message: string) => void;
@@ -48,6 +66,8 @@ interface CommandCenterProps {
   properties: any[];
   permits: any[];
   inspections: any[];
+  onSelectWorkspace?: (productId: string, defaultModule?: string) => void;
+  onOpenSearch?: () => void;
 }
 
 export const CommandCenter: React.FC<CommandCenterProps> = ({
@@ -62,17 +82,19 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   canEdit = true,
   properties,
   permits,
-  inspections
+  inspections,
+  onSelectWorkspace,
+  onOpenSearch
 }) => {
   const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3001' : '');
   const orgId = currentProfile?.organizationId || '';
+  const roleId = currentRole?.id || 'mayor';
 
-  // Local states for forms
-  const [newRequestAddress, setNewRequestAddress] = useState('42 Ferry St, Newark, NJ');
-  const [newRequestType, setNewRequestType] = useState('Trash & Debris');
-  const [newRequestDesc, setNewRequestDesc] = useState('');
+  // Offline sync toggle for field roles
+  const [isOfflineSyncEnabled, setIsOfflineSyncEnabled] = useState(true);
 
-  const [activeInspectionId, setActiveInspectionId] = useState<string | null>('insp_03'); // Default to structural inspection
+  // Inspector Route Checks state
+  const [activeInspectionId, setActiveInspectionId] = useState<string | null>('insp_03');
   const [inspectorNotes, setInspectorNotes] = useState('');
   const [inspectorChecks, setInspectorChecks] = useState({
     masonry: false,
@@ -80,809 +102,445 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
     clearance: false
   });
 
-  // Verification Claim form states
-  const [claimAddress, setClaimAddress] = useState('12 Ferry St, Newark, NJ');
-  const [claimType, setClaimType] = useState('RESIDENT_PROPERTY');
-  const [claimNotes, setClaimNotes] = useState('');
-  const [claimStatusText, setClaimStatusText] = useState('');
+  // Citizen 311 state
+  const [newRequestAddress, setNewRequestAddress] = useState('42 Ferry St, Newark, NJ');
+  const [newRequestType, setNewRequestType] = useState('Trash & Debris');
+  const [newRequestDesc, setNewRequestDesc] = useState('');
 
-  // Appointment Booking states
-  const [apptDept, setApptDept] = useState("Mayor's Office");
-  const [apptDate, setApptDate] = useState('2026-07-15T10:00');
-  const [apptPurpose, setApptPurpose] = useState('');
+  const handleSignOffInspection = (status: 'Passed' | 'Failed') => {
+    if (!activeInspectionId) return;
+    onUpdateInspection(activeInspectionId, {
+      status,
+      notes: inspectorNotes || `Field inspection completed: ${status}`
+    });
+    addNotification(`Signed off inspection ${activeInspectionId} as ${status}`);
+  };
 
-  // Staff Walk-In logging states
-  const [walkinName, setWalkinName] = useState('');
-  const [walkinEmail, setWalkinEmail] = useState('');
-  const [walkinPurpose, setWalkinPurpose] = useState('');
-  const [walkinDept, setWalkinDept] = useState("Mayor's Office");
-  const [escalateTo311, setEscalateTo311] = useState(false);
-
-  // Open Records State for Clerk landing
-  const [openRecords, setOpenRecords] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (orgId && (currentRole.id === 'clerk' || currentProfile?.role?.name === 'City Clerk' || currentProfile?.role?.name === 'Compliance Officer')) {
-      fetch(`${API_URL}/api/open-records`, {
-        headers: { 'x-organization-id': orgId }
-      })
-      .then(res => res.json())
-      .then(data => setOpenRecords(data))
-      .catch(err => console.error('Failed to load open records in CommandCenter:', err));
-    }
-  }, [orgId, currentRole.id]);
-
-  // Handle submitting 311 request
   const handleSubmit311 = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRequestDesc.trim()) return;
 
-    try {
-      const res = await fetch(`${API_URL}/api/tracker`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-organization-id': orgId
-        },
-        body: JSON.stringify({
-          module: '311',
-          title: `${newRequestType}: ${newRequestDesc}`,
-          status: 'Open',
-          priority: newRequestType === 'Structural Hazard' ? 'High' : 'Medium',
-          assignedTo: 'Public Works Operations',
-          slaDays: newRequestType === 'Structural Hazard' ? 2 : 7,
-          address: newRequestAddress
-        })
-      });
+    const newItem: TrackerItem = {
+      id: `TRK-${Math.floor(1000 + Math.random() * 9000)}`,
+      module: '311',
+      title: `${newRequestType}: ${newRequestDesc}`,
+      status: 'Open',
+      priority: newRequestType === 'Structural Hazard' ? 'Critical' : 'Medium',
+      assignedTo: 'Public Works Operations',
+      slaDays: 3,
+      slaProgress: 100,
+      reportedDate: new Date().toISOString().split('T')[0],
+      address: newRequestAddress,
+      comments: [],
+      history: [{ action: 'Created 311 Request', user: currentProfile?.email || 'Resident', date: new Date().toISOString() }],
+      attachments: [],
+      relatedRecords: [],
+      customFields: {}
+    };
 
-      if (res.ok) {
-        const data = await res.json();
-        setTrackerItems(prev => [data, ...prev]);
-        addNotification(`Live database record registered: 311 Case ${data.id}!`);
-        setNewRequestDesc('');
-      } else {
-        addNotification('Database Error: Failed to register 311 ticket.');
-      }
-    } catch (err) {
-      console.error(err);
-      addNotification('API connection error.');
-    }
+    setTrackerItems(prev => [newItem, ...prev]);
+    addNotification(`311 Ticket ${newItem.id} submitted successfully!`);
+    setNewRequestDesc('');
   };
 
-  // Handle Inspector submitting report
-  const handleInspectionSubmit = (status: 'Passed' | 'Failed') => {
-    if (!activeInspectionId) return;
+  // User details
+  const userName = currentProfile?.email?.split('@')[0] || (roleId === 'mayor' ? 'Mayor Naeem Gibbons' : currentRole.name);
+  const userOrg = currentProfile?.organization?.name || 'City of Newark';
 
-    onUpdateInspection(activeInspectionId, {
-      status,
-      notes: inspectorNotes || `Inspection completed. Result: ${status}. Checks: ${JSON.stringify(inspectorChecks)}`
-    });
+  // Role helper checks
+  const isExecutive = roleId === 'mayor' || roleId === 'finance' || roleId === 'global_admin';
+  const isInspector = roleId === 'inspector';
+  const isPublicWorks = roleId === 'public_works';
+  const isClerk = roleId === 'clerk';
+  const isCitizen = ['resident', 'business', 'contractor'].includes(roleId);
 
-    // If inspection is linked to a permit, progress the permit workflow
-    const inspection = INSPECTIONS[activeInspectionId];
-    if (inspection?.permitId) {
-      const permit = PERMITS[inspection.permitId];
-      if (permit) {
-        const updatedSteps = permit.workflowSteps.map(step => {
-          if (step.name === 'Inspections') {
-            return { ...step, status: status === 'Passed' ? 'Completed' as const : 'In Progress' as const, completedDate: status === 'Passed' ? new Date().toISOString().split('T')[0] : undefined };
-          }
-          if (step.name === 'Final Sign-off' && status === 'Passed') {
-            return { ...step, status: 'In Progress' as const };
-          }
-          return step;
-        });
-
-        onUpdatePermit(inspection.permitId, {
-          status: status === 'Passed' ? 'Approved' : 'Issued',
-          workflowSteps: updatedSteps
-        });
-      }
-    }
-
-    addNotification(`Inspection ${activeInspectionId} logged as ${status}`);
-    setInspectorNotes('');
-    setActiveInspectionId(null);
-  };
-
-  const handleCreateClaim = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentProfile?.id) return;
-    try {
-      const res = await fetch(`${API_URL}/api/claims`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-organization-id': orgId
-        },
-        body: JSON.stringify({
-          profileId: currentProfile.id,
-          type: claimType,
-          targetId: 'prop_02', // Default link to Ferry St property
-          targetAddress: claimAddress,
-          notes: claimNotes
-        })
-      });
-      if (res.ok) {
-        addNotification('Verification claim submitted. Awaiting clerk manual audit.');
-        setClaimNotes('');
-        setClaimStatusText('PENDING VERIFICATION');
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleCreateAppt = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_URL}/api/appointments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-organization-id': orgId
-        },
-        body: JSON.stringify({
-          requesterName: getUserDisplayName(),
-          requesterEmail: currentProfile?.email || 'resident@munevo.gov',
-          department: apptDept,
-          scheduledAt: apptDate,
-          purpose: apptPurpose,
-          type: 'APPOINTMENT'
-        })
-      });
-      if (res.ok) {
-        addNotification(`Meeting with ${apptDept} scheduled successfully!`);
-        setApptPurpose('');
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleCreateWalkin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!walkinName.trim()) return;
-    try {
-      const resAppt = await fetch(`${API_URL}/api/appointments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-organization-id': orgId
-        },
-        body: JSON.stringify({
-          requesterName: walkinName,
-          requesterEmail: walkinEmail || 'walkin@constituent.local',
-          department: walkinDept,
-          scheduledAt: new Date().toISOString(),
-          purpose: walkinPurpose,
-          type: 'WALK_IN'
-        })
-      });
-
-      if (escalateTo311 && resAppt.ok) {
-        const res311 = await fetch(`${API_URL}/api/tracker`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-organization-id': orgId,
-            'x-user-id': currentProfile?.id || '',
-            'x-user-email': currentProfile?.email || ''
-          },
-          body: JSON.stringify({
-            module: '311',
-            title: `Constituent Walk-in: ${walkinPurpose}`,
-            status: 'Open',
-            priority: 'Medium',
-            assignedTo: 'Public Works Operations',
-            address: '42 Ferry St, Newark, NJ'
-          })
-        });
-        if (res311.ok) {
-          const trackerItem = await res311.json();
-          setTrackerItems(prev => [trackerItem, ...prev]);
-        }
-      }
-
-      addNotification(`Constituent walk-in logged: ${walkinName}`);
-      setWalkinName('');
-      setWalkinEmail('');
-      setWalkinPurpose('');
-      setEscalateTo311(false);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Helper to determine staff user's name
-  const getUserDisplayName = () => {
-    if (currentProfile?.email) {
-      return currentProfile.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-    }
-    return 'Naeem';
-  };
-
-  // Dynamic Workspace Filters (Epic Hyperspace Landing)
-  const myAssignedTickets = trackerItems.filter(item => {
-    const userEmail = currentProfile?.email || '';
-    const userRoleName = currentProfile?.role?.name || currentRole.name;
-    return (
-      item.assignedTo.toLowerCase().includes(userEmail.toLowerCase()) ||
-      item.assignedTo.toLowerCase().includes(userRoleName.toLowerCase()) ||
-      (currentRole.id === 'inspector' && (item.assignedTo === 'Marcus Miller' || item.assignedTo === 'Elena Rostova')) ||
-      (currentRole.id === 'public_works' && item.assignedTo.includes('Public Works'))
-    );
-  });
-
-  const myScheduledInspections = inspections.filter(insp => {
-    return currentRole.id === 'inspector' || insp.inspectorName.toLowerCase().includes(getUserDisplayName().toLowerCase());
-  });
-
-  const pendingPermits = permits.filter(p => p.status === 'Issued' || p.status === 'In Review');
-
-  const pendingRecords = openRecords.filter(r => r.status === 'Received' || r.status === 'Under Review');
-
-  // Render tailormade Epic Hyperspace layout
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      
-      {/* Title */}
-      <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>
-            Welcome to Munevo Command, <span className="brand-gradient-text">{getUserDisplayName()}</span>
-          </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
-            Personalized Command Center • Role Context: <strong>{currentProfile?.role?.name || currentRole.name}</strong> • Department: {currentRole.department}
-          </p>
-        </div>
-        <div style={{ padding: '6px 12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '6px', fontSize: '11px', color: 'var(--primary-color)', fontWeight: 600 }}>
-          System Online & Encrypted
-        </div>
-      </div>
+    <div className="command-center-dense" style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '24px',
+      padding: '24px',
+      width: '100%',
+      boxSizing: 'border-box',
+      background: 'var(--main-bg)'
+    }}>
 
-      {/* Epic Style Metrics Banner */}
-      <div className="grid-metrics">
-        {currentRole.id === 'mayor' ? (
-          <>
-            <div className="metric-card metric-status-normal">
-              <span className="metric-label">Avg Ticket SLA Time</span>
-              <span className="metric-value">18.4 hrs</span>
-            </div>
-            <div className="metric-card metric-status-warn">
-              <span className="metric-label">Pending Council Votes</span>
-              <span className="metric-value">3 Resolutions</span>
-            </div>
-            <div className="metric-card metric-status-normal">
-              <span className="metric-label">Municipal Budget Health</span>
-              <span className="metric-value">On Track</span>
-            </div>
-            <div className="metric-card metric-status-normal">
-              <span className="metric-label">Revenue Collections</span>
-              <span className="metric-value">98.2%</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="metric-card metric-status-normal">
-              <span className="metric-label">My Assigned Tickets</span>
-              <span className="metric-value">{myAssignedTickets.length} cases</span>
-            </div>
-            <div className="metric-card metric-status-normal">
-              <span className="metric-label">My Scheduled Visits</span>
-              <span className="metric-value">{myScheduledInspections.length} today</span>
-            </div>
-            <div className="metric-card metric-status-warn">
-              <span className="metric-label">Pending Reviews</span>
-              <span className="metric-value">
-                {currentRole.id === 'clerk' ? pendingRecords.length : pendingPermits.length} items
+      {/* 1. TOP HERO AREA */}
+      <div className="glass-card" style={{
+        padding: '24px',
+        borderRadius: '20px',
+        background: 'linear-gradient(135deg, rgba(22, 27, 42, 0.95) 0%, rgba(13, 16, 26, 0.98) 100%)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span className="badge-status badge-success" style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} className="pulse-emerald" />
+                SYSTEM OPERATIONAL
+              </span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                {userOrg} • Monday, July 20, 2026 • 72°F Clear
               </span>
             </div>
-            <div className="metric-card metric-status-normal">
-              <span className="metric-label">Shift Duration logged</span>
-              <span className="metric-value">8.0 hrs</span>
-            </div>
-          </>
-        )}
+            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', margin: '8px 0 2px 0', letterSpacing: '-0.02em' }}>
+              Good Evening, {userName}
+            </h1>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+              {currentRole.description}
+            </p>
+          </div>
+
+          {/* Quick AI & Create Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button 
+              onClick={onOpenSearch}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'rgba(139, 92, 246, 0.18)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+                color: '#a78bfa',
+                padding: '10px 18px',
+                borderRadius: '12px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(139, 92, 246, 0.2)'
+              }}
+            >
+              <Brain size={16} />
+              <span>Ask Munevo AI</span>
+            </button>
+          </div>
+        </div>
+
+        {/* AI Executive Briefing Banner */}
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          borderRadius: '14px',
+          padding: '14px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px'
+        }}>
+          <Sparkles size={20} style={{ color: '#60a5fa', flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: '0.82rem', color: '#e2e8f0', lineHeight: 1.45 }}>
+            <strong style={{ color: '#60a5fa', display: 'inline-block', marginRight: '6px' }}>Sentinel AI Executive Briefing:</strong>
+            {isExecutive ? (
+              "311 SLA response averages improved by 14% this week across Newark West Ward. 4 pending council resolutions require mayoral signature prior to Thursday meeting."
+            ) : isInspector ? (
+              "8 field inspections scheduled today. Route map optimized for 15 Washington St tuckpointing re-inspection. Scaffolding safety compliance pending."
+            ) : isPublicWorks ? (
+              "Water main pressure drop ticket TRK-9831 on Ferry St requires emergency crew dispatch. Equipment inventory logged 95% ready."
+            ) : (
+              "Welcome to MyMunevo Public Portal. Your water bill is up to date and 1 open 311 request is in progress."
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Main Epic Work Board */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
-        
-        {/* Left Column: My Active Queue */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* 2. EXECUTIVE KPI STRIP */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+        gap: '14px'
+      }}>
+        {[
+          { label: '311 Response SLA', val: '18.4 hrs', trend: '-2.1 hrs', status: 'normal', color: '#10b981', icon: Clock },
+          { label: 'Pending Approvals', val: '4 Cases', trend: '+1 Today', status: 'warn', color: '#f59e0b', icon: AlertTriangle },
+          { label: 'Budget Health', val: '$14.2M', trend: '+$1.2M Under', status: 'normal', color: '#3b82f6', icon: DollarSign },
+          { label: 'Revenue Collections', val: '$2.8M YTD', trend: '+98.2%', status: 'normal', color: '#8b5cf6', icon: TrendingUp },
+          { label: 'Active Emergencies', val: '0 Active', trend: 'Optimal', status: 'normal', color: '#10b981', icon: ShieldCheck },
+          { label: 'Capital Projects', val: '92% On Track', trend: '+4%', status: 'normal', color: '#06b6d4', icon: Building2 },
+          { label: 'Workforce Ready', val: '94% Active', trend: '48 Staff', status: 'normal', color: '#ec4899', icon: Users }
+        ].map((kpi, idx) => {
+          const IconC = kpi.icon;
+          return (
+            <div 
+              key={idx}
+              className="glass-card"
+              style={{
+                padding: '16px',
+                borderRadius: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                background: 'rgba(18, 21, 32, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>{kpi.label}</span>
+                <IconC size={15} style={{ color: kpi.color }} />
+              </div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff' }}>{kpi.val}</div>
+              <div style={{ fontSize: '0.68rem', color: kpi.color, fontWeight: 700 }}>{kpi.trend}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 3. MAIN DENSE 3-COLUMN WORKSPACE LAYOUT */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1.2fr)',
+        gap: '24px'
+      }}>
+
+        {/* LEFT COLUMN: Priority Actions, City Pulse & Today's Work */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Section A: Assigned Tickets */}
-          {currentRole.id !== 'mayor' && currentRole.id !== 'resident' && (
-            <div className="glass-card">
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="card-title">
-                  <Clock size={14} style={{ color: 'var(--primary-color)' }} />
-                  <span>My Active Work Queue (Assigned to Me)</span>
-                </div>
-                <span className="badge-status badge-primary" style={{ fontSize: '0.65rem' }}>{myAssignedTickets.length} Open</span>
+          {/* Priority Action Queue */}
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Flame size={18} style={{ color: '#ef4444' }} />
+                <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', margin: 0 }}>Priority Executive Actions</h2>
               </div>
-              
-              <div className="list-queue">
-                {myAssignedTickets.length === 0 ? (
-                  <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-                    No operations tickets are currently assigned to you.
-                  </div>
-                ) : (
-                  myAssignedTickets.map(item => (
-                    <div key={item.id} className="queue-item" onClick={() => onOpenChart('property', 'prop_01')}>
-                      <div className="queue-details">
-                        <span className="queue-title">{item.title}</span>
-                        <span className="queue-sub">{item.address} • SLA Limit: {item.slaDays} days</span>
-                      </div>
-                      <span className={`badge-status ${item.priority === 'Critical' ? 'badge-danger' : 'badge-warn'}`}>
-                        {item.priority}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>4 Items Requiring Sign-off</span>
             </div>
-          )}
 
-          {/* Mayor AI Daily Executive Briefing */}
-          {currentRole.id === 'mayor' && (
-            <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-color)' }}>
-              <div className="card-header">
-                <div className="card-title">
-                  <Sparkles className="brand-gradient-text" size={16} />
-                  <span>AI Daily Executive Briefing</span>
-                </div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Updated 10m ago</span>
-              </div>
-              <p style={{ fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-primary)', margin: 0 }}>
-                Good afternoon Mayor. Newark SLA compliance rates remain strong at <strong>94%</strong>. Building Inspector Elena Rostova is completing structural case reviews at <strong>12 Ferry St</strong>.
-                Additionally, council resolution <strong>LEG-2026-004</strong> (Facade restoration grant funding) is slated for vote certification at tomorrow's public hearing.
-              </p>
-            </div>
-          )}
-
-          {/* Clerk Meeting docket */}
-          {currentRole.id === 'clerk' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">
-                  <Calendar size={14} style={{ color: 'var(--primary-color)' }} />
-                  <span>Upcoming Council Meetings Agenda Packets</span>
-                </div>
-              </div>
-              <div className="list-queue">
-                <div className="queue-item" onClick={() => onOpenChart('legislative', 'LEG-2026-004')}>
-                  <div className="queue-details">
-                    <span className="queue-title">Resolution IX.B.1 (15 Washington St Facade Grant)</span>
-                    <span className="queue-sub">Hearing: 2026-07-09 • Zoning Committee</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '12px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
+                    Grant Resolution RES-2026-094: 15 Washington St Historic Facade
                   </div>
-                  <span className="badge-status badge-warn">Pending Hearing</span>
-                </div>
-                <div className="queue-item" onClick={() => onOpenChart('legislative', 'LEG-2026-007')}>
-                  <div className="queue-details">
-                    <span className="queue-title">Resolution IX.B.2 (West Ward Redevelopment Agreement)</span>
-                    <span className="queue-sub">Hearing: 2026-07-09 • Econ Development</span>
-                  </div>
-                  <span className="badge-status badge-warn">Pending Hearing</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Finance Abatement ledger */}
-          {currentRole.id === 'finance' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">
-                  <DollarSign size={14} style={{ color: 'var(--success-text)' }} />
-                  <span>Active Opportunity Zone Abatements</span>
-                </div>
-              </div>
-              <div className="list-queue">
-                <div className="queue-item" onClick={() => onOpenChart('business', 'DCF Developers, LLC')}>
-                  <div className="queue-details">
-                    <span className="queue-title">West Ward PILOT Agreement: DCF Developers, LLC</span>
-                    <span className="queue-sub">125 & 129 Market St • Code Grade A</span>
-                  </div>
-                  <span className="badge-status badge-success">Enrolled</span>
-                </div>
-                <div className="queue-item" onClick={() => onOpenChart('property', 'prop_04')}>
-                  <div className="queue-details">
-                    <span className="queue-title">Opportunity Zone Abatement: 105 Market St</span>
-                    <span className="queue-sub">Market Street Realty • Tax Delinquent</span>
-                  </div>
-                  <span className="badge-status badge-danger">Lien Eligible</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Planner Variance board */}
-          {currentRole.id === 'planner' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">
-                  <Briefcase size={14} style={{ color: 'var(--primary-color)' }} />
-                  <span>Zoning Variance Approvals Queue</span>
-                </div>
-              </div>
-              <div className="list-queue">
-                <div className="queue-item" onClick={() => onOpenChart('permit', 'perm_05')}>
-                  <div className="queue-details">
-                    <span className="queue-title">Sidewalk Dining Table Variance (PM-2026-0298)</span>
-                    <span className="queue-sub">42 Ferry St • Silva Bakery & Café</span>
-                  </div>
-                  <span className="badge-status badge-success">Approved</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Public Works Work Orders */}
-          {currentRole.id === 'public_works' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">
-                  <Compass size={14} style={{ color: 'var(--accent-color)' }} />
-                  <span>Active Fleet Work Orders</span>
-                </div>
-              </div>
-              <div className="list-queue">
-                <div className="queue-item" onClick={() => onOpenChart('property', 'prop_03')}>
-                  <div className="queue-details">
-                    <span className="queue-title">WO-8832: Repair main water booster connection</span>
-                    <span className="queue-sub">42 Ferry St • Ironbound District • Priority: High</span>
-                  </div>
-                  <span className="badge-status badge-warn">Dispatched</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Resident Form */}
-          {currentRole.id === 'resident' && (
-            <>
-              <div className="glass-card">
-                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div className="card-title">
-                    <Plus size={16} />
-                    <span>Submit a 311 Service Request</span>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    Authorizes $450k municipal co-funding • Requires Mayoral signature before Council meeting
                   </div>
                 </div>
-                <form onSubmit={handleSubmit311} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location Address</label>
-                    <select className="select-filter" value={newRequestAddress} onChange={e => setNewRequestAddress(e.target.value)}>
-                      {Object.values(PROPERTIES).map(p => (
-                        <option key={p.id} value={p.address}>{p.address}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Request Type</label>
-                    <select className="select-filter" value={newRequestType} onChange={e => setNewRequestType(e.target.value)}>
-                      <option value="Trash & Debris">Trash & Debris</option>
-                      <option value="Water Pressure / Leak">Water Pressure & Leak</option>
-                      <option value="Illegal Parking">Illegal Parking</option>
-                      <option value="Structural Hazard">Structural Hazard</option>
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident Details</label>
-                    <textarea className="ai-input" style={{ minHeight: '70px', width: '100%' }} placeholder="Describe the issue you noticed..." value={newRequestDesc} onChange={e => setNewRequestDesc(e.target.value)} required />
-                  </div>
-                  <button type="submit" className="ai-btn-send" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Send size={12} />
-                    <span>Submit 311 Ticket</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => onOpenChart('legislative', 'LEG-2026-004')}
+                    style={{ background: 'var(--primary-color)', color: '#fff', border: 0, padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Review & Sign
                   </button>
-                </form>
+                </div>
               </div>
 
-              {/* Self-Service Property Claim */}
-              <div className="glass-card" style={{ marginTop: '20px' }}>
-                <div className="card-header">
-                  <div className="card-title">
-                    <Building size={16} />
-                    <span>Claim a Property / Project (Self-Service)</span>
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '12px',
+                background: 'rgba(245, 158, 11, 0.08)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
+                    Code Violation CE-2026-0122: Scaffolding Stop Work Sign-off
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    Building official sign-off pending re-inspection of tuckpointing masonry
                   </div>
                 </div>
-                <form onSubmit={handleCreateClaim} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Claim Type</label>
-                    <select className="select-filter" value={claimType} onChange={e => setClaimType(e.target.value)}>
-                      <option value="RESIDENT_PROPERTY">Resident Property Owner / Tenant</option>
-                      <option value="CONTRACTOR_PROJECT">Contractor Project Association</option>
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Address / Location</label>
-                    <select className="select-filter" value={claimAddress} onChange={e => setClaimAddress(e.target.value)}>
-                      {Object.values(PROPERTIES).map(p => (
-                        <option key={p.id} value={p.address}>{p.address}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Verification Notes / Proof</label>
-                    <textarea 
-                      className="ai-input" 
-                      style={{ minHeight: '60px', width: '100%' }} 
-                      placeholder="Enter utility account details or lease verification info..." 
-                      value={claimNotes} 
-                      onChange={e => setClaimNotes(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <button type="submit" className="ai-btn-send">
-                      Submit Association Claim
-                    </button>
-                    {claimStatusText && (
-                      <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--warning-text)' }}>
-                        {claimStatusText}
-                      </span>
-                    )}
-                  </div>
-                </form>
+                <button 
+                  onClick={() => onOpenChart('property', 'prop_02')}
+                  style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  View Case
+                </button>
               </div>
-            </>
-          )}
+            </div>
+          </div>
+
+          {/* City Pulse & Live Operational Map Preview */}
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapIcon size={18} style={{ color: '#3b82f6' }} />
+                <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', margin: 0 }}>City Pulse Spatial Intelligence</h2>
+              </div>
+              <button 
+                onClick={() => onSelectWorkspace && onSelectWorkspace('gis', 'gis')}
+                style={{ background: 'transparent', border: 0, color: '#3b82f6', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Open Full GIS Map →
+              </button>
+            </div>
+
+            {/* Map Preview Canvas */}
+            <div style={{
+              height: '220px',
+              borderRadius: '12px',
+              background: '#0e111a',
+              border: '1px solid var(--border-color)',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <svg width="100%" height="100%" style={{ background: '#090b11' }}>
+                <line x1="0" y1="50" x2="600" y2="50" stroke="#1b2030" strokeWidth="2" />
+                <line x1="0" y1="120" x2="600" y2="120" stroke="#1b2030" strokeWidth="2" />
+                <line x1="0" y1="180" x2="600" y2="180" stroke="#1b2030" strokeWidth="2" />
+                <line x1="100" y1="0" x2="100" y2="250" stroke="#1b2030" strokeWidth="2" />
+                <line x1="300" y1="0" x2="300" y2="250" stroke="#1b2030" strokeWidth="2" />
+                <line x1="450" y1="0" x2="450" y2="250" stroke="#1b2030" strokeWidth="2" />
+
+                {/* Hotspot Pins */}
+                <circle cx="300" cy="120" r="10" fill="rgba(239, 68, 68, 0.2)" />
+                <circle cx="300" cy="120" r="4" fill="#ef4444" />
+                <text x="312" y="124" fill="#fff" fontSize="10" fontWeight="700">105 Market St (Awning Rot)</text>
+
+                <circle cx="100" cy="50" r="10" fill="rgba(245, 158, 11, 0.2)" />
+                <circle cx="100" cy="50" r="4" fill="#f59e0b" />
+                <text x="112" y="54" fill="#fff" fontSize="10" fontWeight="700">15 Washington St (Scaffolding)</text>
+
+                <circle cx="450" cy="180" r="10" fill="rgba(16, 185, 129, 0.2)" />
+                <circle cx="450" cy="180" r="4" fill="#10b981" />
+                <text x="462" y="184" fill="#fff" fontSize="10" fontWeight="700">42 Ferry St (Water Service)</text>
+              </svg>
+
+              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'rgba(0,0,0,0.75)', padding: '4px 10px', borderRadius: '6px', fontSize: '0.7rem', color: '#9aa3b2' }}>
+                Newark GIS Layers Active • 3 Incident Hotspots
+              </div>
+            </div>
+          </div>
+
+          {/* Today's Work & Schedule Calendar */}
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={18} style={{ color: '#10b981' }} />
+                <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', margin: 0 }}>Today's Operational Schedule</h2>
+              </div>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Monday, July 20, 2026</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { time: '09:00 AM', title: 'Executive Cabinet Briefing', dept: 'Executive Hall', type: 'Meeting' },
+                { time: '11:30 AM', title: 'Site Inspection: 15 Washington St Masonry Netting', dept: 'Code Enforcement', type: 'Inspection' },
+                { time: '02:00 PM', title: 'City Council Agenda Review & Voting Prep', dept: 'Clerk Vault', type: 'Legislative' },
+                { time: '04:30 PM', title: 'Ironbound Water Main Repair Progress Call', dept: 'Public Works', type: 'Work Order' }
+              ].map((item, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary-color)', minWidth: '70px' }}>{item.time}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>{item.title}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.dept}</div>
+                  </div>
+                  <span className="badge-status badge-primary" style={{ fontSize: '0.65rem' }}>{item.type}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
         </div>
 
-        {/* Right Column: Schedule & Shortcuts */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* RIGHT COLUMN: AI Insights, Recent Activity & Pinned Workspaces */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Inspector schedule and log notes */}
-          {currentRole.id === 'inspector' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">
-                  <Calendar size={14} style={{ color: 'var(--warning-text)' }} />
-                  <span>My Scheduled Inspections Today</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {myScheduledInspections.length === 0 ? (
-                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
-                    No field audits scheduled for today.
-                  </div>
-                ) : (
-                  myScheduledInspections.map(insp => {
-                    const isSelected = activeInspectionId === insp.id;
-                    const prop = PROPERTIES[insp.propertyId];
-                    return (
-                      <div 
-                        key={insp.id} 
-                        onClick={() => {
-                          setActiveInspectionId(insp.id);
-                          setInspectorNotes(insp.notes);
-                        }}
-                        style={{
-                          padding: '10px 14px',
-                          background: isSelected ? 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.12)' : 'rgba(255,255,255,0.02)',
-                          border: `1px solid ${isSelected ? 'var(--primary-color)' : 'var(--border-color)'}`,
-                          borderRadius: '8px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>{insp.type} Inspection ({insp.id})</span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{prop?.address}</span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {activeInspectionId && (
-                <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-color)', margin: 0 }}>
-                    File Field Notes: {activeInspectionId}
-                  </h4>
-                  <textarea
-                    className="ai-input"
-                    style={{ minHeight: '60px', width: '100%' }}
-                    placeholder="Enter inspection observations..."
-                    value={inspectorNotes}
-                    onChange={e => setInspectorNotes(e.target.value)}
-                  />
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button className="ai-btn-send" style={{ backgroundColor: 'var(--danger)', border: 0 }} onClick={() => handleInspectionSubmit('Failed')}>Fail</button>
-                    <button className="ai-btn-send" onClick={() => handleInspectionSubmit('Passed')}>Pass</button>
-                  </div>
-                </div>
-              )}
+          {/* Pinned Workspaces Grid Card */}
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <Pin size={16} style={{ color: 'var(--primary-color)' }} />
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', margin: 0 }}>Pinned Workspaces</h3>
             </div>
-          )}
 
-          {/* Clerk Records Requests queue */}
-          {currentRole.id === 'clerk' && (
-            <>
-              <div className="glass-card">
-                <div className="card-header">
-                  <div className="card-title">
-                    <FileText size={14} style={{ color: 'var(--warning-text)' }} />
-                    <span>Pending FOIA / Record Requests</span>
-                  </div>
-                </div>
-                <div className="list-queue">
-                  {pendingRecords.length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
-                      No record requests require review.
-                    </div>
-                  ) : (
-                    pendingRecords.map(req => (
-                      <div key={req.id} className="queue-item" onClick={() => onOpenChart('property', 'prop_01')}>
-                        <div className="queue-details">
-                          <span className="queue-title">{req.requesterName}</span>
-                          <span className="queue-sub" style={{ display: 'block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {req.description}
-                          </span>
-                        </div>
-                        <span className="badge-status badge-warn">{req.status}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Clerk Walk-In Log Form */}
-              <div className="glass-card" style={{ marginTop: '20px' }}>
-                <div className="card-header">
-                  <div className="card-title">
-                    <UserPlus size={14} style={{ color: 'var(--accent-color)' }} />
-                    <span>Constituent Walk-In Intake Registry</span>
-                  </div>
-                </div>
-                <form onSubmit={handleCreateWalkin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Constituent Name</label>
-                      <input type="text" className="ai-input" style={{ width: '100%' }} value={walkinName} onChange={e => setWalkinName(e.target.value)} placeholder="e.g. John Miller" required />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Constituent Email</label>
-                      <input type="email" className="ai-input" style={{ width: '100%' }} value={walkinEmail} onChange={e => setWalkinEmail(e.target.value)} placeholder="e.g. john@mail.com" />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Destination Office</label>
-                    <select className="select-filter" value={walkinDept} onChange={e => setWalkinDept(e.target.value)}>
-                      <option value="Mayor's Office">Mayor's Office</option>
-                      <option value="Ward 1 Council Office">Ward 1 Council Office</option>
-                      <option value="Ward 2 Council Office">Ward 2 Council Office</option>
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Visit Description</label>
-                    <textarea className="ai-input" style={{ minHeight: '60px', width: '100%' }} placeholder="What does the constituent need assistance with?" value={walkinPurpose} onChange={e => setWalkinPurpose(e.target.value)} required />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem' }}>
-                      <input type="checkbox" checked={escalateTo311} onChange={e => setEscalateTo311(e.target.checked)} />
-                      Escalate & dispatch 311 operations ticket
-                    </label>
-                    <button type="submit" className="ai-btn-send">
-                      Log Intake Visit
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </>
-          )}
-
-          {/* Finance approvals list */}
-          {currentRole.id === 'finance' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Pending Requisition Approvals</div>
-              </div>
-              <div className="list-queue">
-                <div className="queue-item" onClick={() => onOpenChart('permit', 'perm_03')}>
-                  <div className="queue-details">
-                    <span className="queue-title">Water Pump Booster ($35,000)</span>
-                    <span className="queue-sub">Capital Projects Allocation</span>
-                  </div>
-                  <button 
-                    className="ai-btn-send"
-                    style={{ height: '24px', fontSize: '0.65rem', padding: '0 8px' }}
-                    onClick={e => {
-                      e.stopPropagation();
-                      addNotification('Requisition approved!');
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              {WORKSPACE_CATALOG.slice(0, 6).map(w => {
+                const IconC = w.icon;
+                return (
+                  <div 
+                    key={`cmd-pinned-${w.id}`}
+                    onClick={() => onSelectWorkspace && onSelectWorkspace(w.id, w.defaultModule)}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '12px',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--border-color)',
+                      borderLeft: `3px solid ${w.color}`,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      transition: 'background 0.15s ease'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                   >
-                    Approve
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Mayor shortcuts list */}
-          {currentRole.id === 'mayor' && (
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Executive Council Actions</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button className="btn-action" onClick={() => onOpenChart('legislative', 'LEG-2026-004')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', cursor: 'pointer' }}>
-                  <Gavel size={14} />
-                  <span>Review Facade Grant resolution</span>
-                </button>
-                <button className="btn-action" onClick={() => onOpenChart('property', 'prop_04')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', cursor: 'pointer' }}>
-                  <AlertTriangle size={14} style={{ color: 'var(--danger-text)' }} />
-                  <span>Review Delinquent Conservation Case</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Resident utility bills */}
-          {currentRole.id === 'resident' && (
-            <>
-              <div className="glass-card">
-                <div className="card-header">
-                  <div className="card-title">My Utilities & Tax Statements</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Water Service Account</span>
-                      <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--warning-text)' }}>$84.50 Due</span>
+                    <IconC size={16} style={{ color: w.color }} />
+                    <div style={{ overflow: 'hidden' }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{w.name}</div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{w.tagline}</div>
                     </div>
-                    <button className="ai-btn-send" style={{ height: '32px' }} onClick={() => addNotification('Utility payment processed!')}>Pay Bill</button>
                   </div>
-                </div>
-              </div>
+                );
+              })}
+            </div>
+          </div>
 
-              {/* Book Appointment Card */}
-              <div className="glass-card" style={{ marginTop: '20px' }}>
-                <div className="card-header">
-                  <div className="card-title">
-                    <Calendar size={14} style={{ color: 'var(--primary-color)' }} />
-                    <span>Book Department Appointment</span>
+          {/* AI Risk Insights */}
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(18, 21, 32, 0.7) 100%)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <Brain size={18} style={{ color: '#8b5cf6' }} />
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', margin: 0 }}>Sentinel AI Anomalies</h3>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', fontSize: '0.78rem', color: '#e2e8f0', lineHeight: 1.4 }}>
+                <strong style={{ color: '#f59e0b', display: 'block' }}>Unusual 311 Volume:</strong>
+                Ferry St water pressure tickets elevated by 32% since 08:00 AM. Cross-referenced with hydrants ledger.
+              </div>
+              <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', fontSize: '0.78rem', color: '#e2e8f0', lineHeight: 1.4 }}>
+                <strong style={{ color: '#10b981', display: 'block' }}>Revenue Optimization:</strong>
+                Commercial mercantile renewals pacing 8% ahead of projections for Q3.
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Real-Time Activity Feed */}
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={18} style={{ color: '#06b6d4' }} />
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', margin: 0 }}>Live Activity Feed</h3>
+              </div>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Real-time Audit</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { text: 'Permit BP-2026-0145 approved for 125 Market St', time: '12m ago', user: 'Building Official' },
+                { text: 'Field inspection passed for 920 Broad St', time: '45m ago', user: 'Jenkins S.' },
+                { text: 'Resolution RES-2026-094 attached to Council agenda', time: '1h ago', user: 'Clerk Office' },
+                { text: '311 Case TRK-9831 updated to In Progress', time: '2h ago', user: 'Water Crew' }
+              ].map((act, i) => (
+                <div key={i} style={{ display: 'flex', gap: '10px', fontSize: '0.75rem', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <span style={{ color: 'var(--primary-color)', fontWeight: 800 }}>•</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#fff', fontWeight: 600 }}>{act.text}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>{act.user} • {act.time}</div>
                   </div>
                 </div>
-                <form onSubmit={handleCreateAppt} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Department / Office</label>
-                    <select className="select-filter" value={apptDept} onChange={e => setApptDept(e.target.value)}>
-                      <option value="Mayor's Office">Mayor's Office</option>
-                      <option value="Ward 1 Council Office">Ward 1 Council Office</option>
-                      <option value="Zoning Board Office">Zoning Board Office</option>
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Requested Date & Time</label>
-                    <input 
-                      type="datetime-local" 
-                      className="select-filter" 
-                      value={apptDate} 
-                      onChange={e => setApptDate(e.target.value)} 
-                      style={{ color: '#fff', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px 10px', borderRadius: '6px' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Meeting Purpose</label>
-                    <textarea 
-                      className="ai-input" 
-                      style={{ minHeight: '60px', width: '100%' }} 
-                      placeholder="Enter meeting agenda..." 
-                      value={apptPurpose} 
-                      onChange={e => setApptPurpose(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  <button type="submit" className="ai-btn-send">
-                    Schedule Meeting
-                  </button>
-                </form>
-              </div>
-            </>
-          )}
+              ))}
+            </div>
+          </div>
 
         </div>
 

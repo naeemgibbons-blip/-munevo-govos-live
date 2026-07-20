@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Logo } from './components/Logo';
+import { WorkspaceHome } from './components/WorkspaceHome';
 import { CommandCenter } from './components/CommandCenter';
 import { ChartingSystem, ChartTabItem } from './components/ChartingSystem';
 import { GisMap } from './components/GisMap';
@@ -60,7 +61,7 @@ function App() {
   // Layout Modules & Platform Shell State
   const [activeProduct, setActiveProduct] = useState('core');
   const [activeModule, setActiveModule] = useState('command-center');
-  const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field' | 'marketing'>('marketing');
+  const [viewMode, setViewMode] = useState<'workspace-home' | 'module' | 'chart' | 'mobile-field' | 'marketing'>('marketing');
   const [isUniversalSearchOpen, setIsUniversalSearchOpen] = useState(false);
   const [isGlobalCreateOpen, setIsGlobalCreateOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -552,14 +553,25 @@ function App() {
         onLoginDemo={(demoProfile) => {
           setCurrentProfile(demoProfile);
           setTenant(demoProfile.organization.slug);
-          setViewMode('module');
+          setViewMode('workspace-home');
         }}
         onEnterApp={() => {
           if (!currentProfile) {
             setCurrentProfile(activeProfile);
           }
-          setViewMode('module');
+          setViewMode('workspace-home');
         }}
+        addNotification={addNotification}
+      />
+    );
+  } else if (viewMode === 'workspace-home') {
+    content = (
+      <WorkspaceHome
+        currentRole={currentRole}
+        currentProfile={activeProfile}
+        onSelectWorkspace={handleSelectWorkspace}
+        onOpenSearch={() => setIsCommandPaletteOpen(true)}
+        onOpenRecord={handleOpenChart}
         addNotification={addNotification}
       />
     );
@@ -854,27 +866,53 @@ function App() {
 
             {/* Persistent Record Tab Strip (Epic Hyperspace / Salesforce Lightning style) */}
             <div style={{ display: 'flex', gap: '4px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px', overflowX: 'auto', width: '100%' }}>
-              {/* Pinned Home Tab */}
+              {/* Workspace Launcher (Home) Tab */}
               <button
-                onClick={() => setViewMode('module')}
+                onClick={() => setViewMode('workspace-home')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   padding: '6px 14px',
                   borderRadius: '6px 6px 0 0',
-                  background: viewMode === 'module' ? '#1a1d28' : 'transparent',
+                  background: (viewMode as string) === 'workspace-home' ? '#1a1d28' : 'transparent',
                   border: '1px solid var(--border-color)',
-                  borderBottom: viewMode === 'module' ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
-                  color: viewMode === 'module' ? '#fff' : 'var(--text-secondary)',
+                  borderBottom: (viewMode as string) === 'workspace-home' ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                  color: (viewMode as string) === 'workspace-home' ? '#fff' : 'var(--text-secondary)',
                   fontSize: '0.76rem',
-                  fontWeight: viewMode === 'module' ? 700 : 500,
+                  fontWeight: (viewMode as string) === 'workspace-home' ? 700 : 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Sparkles size={13} style={{ color: '#3b82f6' }} />
+                <span>Workspace Home</span>
+              </button>
+
+              {/* Command Center Operational Tab */}
+              <button
+                onClick={() => {
+                  handleSelectWorkspace('core', 'command-center');
+                  setViewMode('module');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '6px 6px 0 0',
+                  background: viewMode === 'module' && activeModule === 'command-center' ? '#1a1d28' : 'transparent',
+                  border: '1px solid var(--border-color)',
+                  borderBottom: viewMode === 'module' && activeModule === 'command-center' ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                  color: viewMode === 'module' && activeModule === 'command-center' ? '#fff' : 'var(--text-secondary)',
+                  fontSize: '0.76rem',
+                  fontWeight: viewMode === 'module' && activeModule === 'command-center' ? 700 : 500,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap'
                 }}
               >
                 <Layers size={13} style={{ color: 'var(--primary-color)' }} />
-                <span>Command Center (Home)</span>
+                <span>Command Center (Operations)</span>
               </button>
 
               {/* Open Record Tabs */}
@@ -944,7 +982,7 @@ function App() {
                 {activeModule === 'command-center' && (
                   <CommandCenter 
                     currentRole={currentRole}
-                    currentProfile={currentProfile}
+                    currentProfile={activeProfile}
                     onOpenChart={handleOpenChart}
                     trackerItems={trackerItems}
                     setTrackerItems={setTrackerItems}
@@ -955,6 +993,8 @@ function App() {
                     properties={Object.values(properties)}
                     permits={permits}
                     inspections={inspections}
+                    onSelectWorkspace={handleSelectWorkspace}
+                    onOpenSearch={() => setIsCommandPaletteOpen(true)}
                   />
                 )}
 
@@ -1191,7 +1231,8 @@ function App() {
       {/* Munevo Canvas OS Floating Dynamic Dock */}
       {viewMode !== 'marketing' && viewMode !== 'mobile-field' && (
         <FloatingDock 
-          onGoHome={() => {
+          onGoHome={() => setViewMode('workspace-home')}
+          onGoCommandCenter={() => {
             handleSelectWorkspace('core', 'command-center');
             setViewMode('module');
           }}
@@ -1208,6 +1249,7 @@ function App() {
             setViewMode('module');
           }}
           activeModule={activeModule}
+          viewMode={viewMode}
         />
       )}
 
