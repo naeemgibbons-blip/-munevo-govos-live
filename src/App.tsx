@@ -537,8 +537,16 @@ function App() {
   const activeChartTab = chartTabs.find(t => t.id === activeChartTabId) || null;
   const isDemoSandbox = currentProfile?.organization?.slug?.startsWith('demo-') || !currentProfile;
 
+  const activeProfile = currentProfile || {
+    id: 'simulated-user-mayor',
+    email: 'mayor@munevo.gov',
+    isGlobalAdmin: false,
+    isOrgAdmin: true,
+    organization: { slug: tenant || 'newark', name: tenant === 'austin' ? 'City of Austin' : 'City of Newark' }
+  };
+
   let content;
-  if (viewMode === 'marketing' || !currentProfile) {
+  if (viewMode === 'marketing') {
     content = (
       <MarketingLanding 
         onLoginDemo={(demoProfile) => {
@@ -547,6 +555,9 @@ function App() {
           setViewMode('module');
         }}
         onEnterApp={() => {
+          if (!currentProfile) {
+            setCurrentProfile(activeProfile);
+          }
           setViewMode('module');
         }}
         addNotification={addNotification}
