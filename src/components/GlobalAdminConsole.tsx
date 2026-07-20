@@ -23,7 +23,9 @@ interface Organization {
 interface Profile {
   id: string;
   email: string;
-  role: string;
+  role: any;
+  isGlobalAdmin: boolean;
+  isOrgAdmin: boolean;
   organizationId: string | null;
   organization?: Organization | null;
   createdAt: string;
@@ -32,7 +34,8 @@ interface Profile {
 interface Invite {
   id: string;
   email: string;
-  role: string;
+  role: any;
+  isOrgAdmin: boolean;
   organizationId: string | null;
   organization?: Organization | null;
   status: string;
@@ -395,7 +398,9 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
                 <div key={prof.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px' }}>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>{prof.email}</div>
-                    <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: '2px', fontWeight: 600 }}>{prof.role}</div>
+                    <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: '2px', fontWeight: 600 }}>
+                      {prof.isGlobalAdmin ? 'Global Admin' : prof.isOrgAdmin ? 'Org Admin' : (typeof prof.role === 'object' ? prof.role?.name : (prof.role || 'Staff'))}
+                    </div>
                   </div>
                   <span style={{ fontSize: '10px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
                     {prof.organization?.name || 'Global'}
@@ -426,7 +431,9 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', color: 'var(--text-muted)' }}>
-                    <span>Role: <strong style={{ color: 'var(--text-secondary)' }}>{inv.role}</strong></span>
+                    <span>Role: <strong style={{ color: 'var(--text-secondary)' }}>
+                      {inv.isOrgAdmin ? 'Org Admin' : (typeof inv.role === 'object' ? inv.role?.name : (inv.role || 'Staff'))}
+                    </strong></span>
                     <span>Org: <strong style={{ color: 'var(--text-secondary)' }}>{inv.organization?.name || 'Global'}</strong></span>
                   </div>
                   <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', padding: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', overflowX: 'auto' }}>

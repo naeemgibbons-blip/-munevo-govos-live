@@ -2,6 +2,31 @@ import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
+
+function loadEnvFile(filePath: string) {
+  try {
+    const fullPath = path.resolve(filePath);
+    if (fs.existsSync(fullPath)) {
+      const content = fs.readFileSync(fullPath, 'utf8');
+      content.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return;
+        const parts = trimmed.split('=');
+        const key = parts[0].trim();
+        const val = parts.slice(1).join('=').trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+        process.env[key] = val;
+      });
+    }
+  } catch (err) {
+    // Ignore
+  }
+}
+
+// Load env files
+loadEnvFile('.env');
+loadEnvFile('.env.local');
 
 const originalEnv = {
   DATABASE_URL: process.env.DATABASE_URL,

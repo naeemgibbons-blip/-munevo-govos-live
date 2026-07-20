@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Sidebar } from './components/Sidebar';
 import { Logo } from './components/Logo';
 import { CommandCenter } from './components/CommandCenter';
 import { ChartingSystem, ChartTabItem } from './components/ChartingSystem';
@@ -15,6 +14,16 @@ import { EmployeeRoster } from './components/EmployeeRoster';
 import { AuditTrail } from './components/AuditTrail';
 import { MobileFieldView } from './components/MobileFieldView';
 import { MarketingLanding } from './components/MarketingLanding';
+import { CityPulse } from './components/CityPulse';
+import { KnowledgeGraph } from './components/KnowledgeGraph';
+import { Marketplace } from './components/Marketplace';
+import { UniversalSearchModal } from './components/UniversalSearchModal';
+import { CommandPalette } from './components/CommandPalette';
+import { NotificationCenterDrawer } from './components/NotificationCenterDrawer';
+import { PlatformActivityFeed } from './components/PlatformActivityFeed';
+import { UniversalCreateModal } from './components/UniversalCreateModal';
+import { PlatformControlCenter } from './components/PlatformControlCenter';
+import { FloatingDock } from './components/FloatingDock';
 import { supabase, updateSupabaseConfig } from './supabaseClient';
 import { 
   USER_ROLES, 
@@ -29,7 +38,7 @@ import {
   InspectionRecord,
   LegislativeItem
 } from './mockData';
-import { Bell, Search, AlertCircle, Smartphone } from 'lucide-react';
+import { Bell, Search, AlertCircle, Smartphone, Plus, ChevronRight, Sparkles, Layers, Shield, Wrench, Calendar, CheckSquare } from 'lucide-react';
 
 interface ToastMessage {
   id: number;
@@ -48,9 +57,31 @@ function App() {
   const [customRoles, setCustomRoles] = useState<any[]>([]);
   const [currentProfile, setCurrentProfile] = useState<any>(null);
 
-  // Layout Modules
+  // Layout Modules & Platform Shell State
+  const [activeProduct, setActiveProduct] = useState('core');
   const [activeModule, setActiveModule] = useState('command-center');
   const [viewMode, setViewMode] = useState<'module' | 'chart' | 'mobile-field' | 'marketing'>('marketing');
+  const [isUniversalSearchOpen, setIsUniversalSearchOpen] = useState(false);
+  const [isGlobalCreateOpen, setIsGlobalCreateOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createModalInitialType, setCreateModalInitialType] = useState('permit');
+
+  // Workspace Memory: Preserves active module per workspace product
+  const [workspaceMemory, setWorkspaceMemory] = useState<Record<string, string>>({});
+
+  const handleSelectWorkspace = (productId: string, defaultModule?: string) => {
+    setActiveProduct(productId);
+    const rememberedModule = workspaceMemory[productId] || defaultModule || 'command-center';
+    setActiveModule(rememberedModule);
+    setViewMode('module');
+  };
+
+  const handleSetModuleWithMemory = (modId: string) => {
+    setActiveModule(modId);
+    setWorkspaceMemory(prev => ({ ...prev, [activeProduct]: modId }));
+  };
 
   // Chart Workspace Tabs State
   const [chartTabs, setChartTabs] = useState<ChartTabItem[]>([]);
@@ -381,7 +412,7 @@ function App() {
     }
   };
 
-  const handleOpenChart = (type: 'property' | 'permit' | 'legislative' | 'business', id: string) => {
+  const handleOpenChart = (type: 'property' | 'permit' | 'legislative' | 'business' | 'project', id: string) => {
     let label = id;
     if (type === 'property') {
       label = properties[id]?.address.split(',')[0] || id;
@@ -531,20 +562,8 @@ function App() {
     );
   } else {
     content = (
-      <div className="app-container">
-      <Sidebar 
-        activeModule={activeModule}
-        setActiveModule={(mod) => {
-          setActiveModule(mod);
-          setViewMode('module');
-        }}
-        currentRole={currentRole}
-        tenant={tenant}
-        setTenant={setTenant}
-        currentProfile={currentProfile}
-      />
-
-      <main className="main-panel">
+      <div className="app-container" style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <main className="main-panel" role="main" aria-label="Munevo Government OS Platform Workspace" style={{ flex: 1, width: '100%' }}>
         {['resident', 'business', 'contractor'].includes(currentRole.id) ? (
           <header className="dashboard-header" style={{
             background: '#16181d',
@@ -631,70 +650,123 @@ function App() {
             </div>
           </header>
         ) : (
-          <header className="dashboard-header">
-            <div className="header-search" style={{ position: 'relative' }}>
-              <input 
-                type="text" 
-                placeholder="Search properties, permits, cases (e.g. 'Ferry St', 'PM-2026')..." 
-                value={searchVal}
-                onChange={(e) => setSearchVal(e.target.value)}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-              />
-              <Search className="header-search-icon" size={14} />
-
-              {searchFocused && searchResults && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  background: '#11131c',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  marginTop: '6px',
-                  maxHeight: '320px',
-                  overflowY: 'auto',
-                  zIndex: 1000,
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
-                }}>
-                  {Object.keys(searchResults).map(category => {
-                    const items = searchResults[category];
-                    if (items.length === 0) return null;
-                    return (
-                      <div key={category} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--primary-color)', padding: '6px 12px', background: 'rgba(255,255,255,0.01)', textTransform: 'uppercase' }}>
-                          {category}
-                        </div>
-                        {items.map((item: any) => (
-                          <div 
-                            key={item.id} 
-                            onClick={() => {
-                              handleOpenChart(item.type, item.id);
-                              setSearchVal('');
-                            }}
-                            style={{
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              fontSize: '11.5px',
-                              color: '#fff',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '2px'
-                            }}
-                          >
-                            <span style={{ fontWeight: 600 }}>{item.label}</span>
-                            <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)' }}>{item.sub}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })}
+          <header className="dashboard-header" style={{ display: 'flex', flexDirection: 'column', padding: '10px 24px 0 24px', background: '#11131c', borderBottom: '1px solid var(--border-color)', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              {/* Left Header: Universal Search Input */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, maxWidth: '680px' }}>
+                <div 
+                  className="header-search" 
+                  onClick={() => setIsCommandPaletteOpen(true)}
+                  style={{ 
+                    flex: 1, 
+                    position: 'relative', 
+                    cursor: 'pointer',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  <Search size={15} style={{ color: 'var(--primary-color)' }} />
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', flex: 1 }}>
+                    Search 54 Market St, PERM-2026-081, Ironbound Cafe (Cmd+K)...
+                  </span>
+                  <kbd style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    fontSize: '0.65rem',
+                    color: 'var(--text-muted)',
+                    fontWeight: 700
+                  }}>
+                    Ctrl+K
+                  </kbd>
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div className="header-actions">
+              {/* Right Header Actions */}
+              <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Global Create Button */}
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'var(--primary-color)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '7px 14px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                  }}
+                >
+                  <Plus size={14} />
+                  <span>Global Create</span>
+                </button>
+
+                {isGlobalCreateOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '6px',
+                    width: '210px',
+                    background: '#161824',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '10px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                    zIndex: 1000,
+                    padding: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                  }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', padding: '6px 10px', textTransform: 'uppercase' }}>
+                      Create UDM Record
+                    </div>
+                    {[
+                      { label: '+ Permit Application', type: 'permit', action: () => { handleOpenChart('permit', 'PM-2026-99'); addNotification('Initiated new Permit record context'); } },
+                      { label: '+ 311 Work Order', type: 'workorder', action: () => { setActiveModule('tracker'); addNotification('Initiated new 311 Ticket record context'); } },
+                      { label: '+ Code Violation Case', type: 'violation', action: () => { setActiveModule('code-enforcement'); addNotification('Initiated Code Violation case'); } },
+                      { label: '+ Council Resolution', type: 'council', action: () => { setActiveModule('legislative'); addNotification('Drafted Legislative Council Agenda item'); } }
+                    ].map((item, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          item.action();
+                          setIsGlobalCreateOpen(false);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#fff',
+                          textAlign: 'left',
+                          padding: '8px 10px',
+                          fontSize: '0.78rem',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {chartTabs.length > 0 && (
                 <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
                   <button 
@@ -709,7 +781,7 @@ function App() {
                       cursor: 'pointer'
                     }}
                   >
-                    Dashboard View
+                    Workspace View
                   </button>
                   <button 
                     onClick={() => setViewMode('chart')}
@@ -723,10 +795,11 @@ function App() {
                       cursor: 'pointer'
                     }}
                   >
-                    Chart Workspace ({chartTabs.length})
+                    Record Tabs ({chartTabs.length})
                   </button>
                 </div>
               )}
+
               {/* Mobile Field View Switcher */}
               <button 
                 onClick={() => setViewMode('mobile-field')}
@@ -745,59 +818,12 @@ function App() {
                 }}
               >
                 <Smartphone size={12} style={{ color: 'var(--accent-color)' }} />
-                <span>Mobile Field Ops</span>
-              </button>
-
-              {isDemoSandbox && (
-                <button 
-                  onClick={() => setViewMode('marketing')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    border: '1px solid var(--border-color)',
-                    background: 'rgba(255,255,255,0.03)',
-                    color: '#fff',
-                    padding: '6px 12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    borderRadius: '6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <span>View Marketing Page</span>
-                </button>
-              )}
-
-              <button 
-                onClick={async () => {
-                  if (isDemoSandbox) {
-                    setCurrentProfile(null);
-                    setViewMode('marketing');
-                  } else {
-                    await supabase.auth.signOut();
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  background: 'rgba(239, 68, 68, 0.05)',
-                  color: 'var(--danger-text)',
-                  padding: '6px 12px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  borderRadius: '6px',
-                  cursor: 'pointer'
-                }}
-              >
-                {isDemoSandbox ? 'Exit to Sales Site' : 'Sign Out'}
+                <span>Field Ops</span>
               </button>
 
               {isDemoSandbox && (
                 <div className="role-switcher-container">
-                  <span className="role-switcher-label">GovOS Session:</span>
+                  <span className="role-switcher-label">Session:</span>
                   <select className="role-select" value={currentRole.id} onChange={handleRoleChange}>
                     <option value="mayor">Mayor / City Manager</option>
                     <option value="inspector">Building Inspector</option>
@@ -809,10 +835,84 @@ function App() {
                 </div>
               )}
 
-              <div className="notification-bell" onClick={() => addNotification('System audit logs are fully synced.')}>
+              <div className="notification-bell" onClick={() => setIsNotificationDrawerOpen(!isNotificationDrawerOpen)} title="Universal Notification Center">
                 <Bell size={18} />
                 <div className="notification-badge" />
               </div>
+            </div>
+
+            {/* Persistent Record Tab Strip (Epic Hyperspace / Salesforce Lightning style) */}
+            <div style={{ display: 'flex', gap: '4px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px', overflowX: 'auto', width: '100%' }}>
+              {/* Pinned Home Tab */}
+              <button
+                onClick={() => setViewMode('module')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '6px 6px 0 0',
+                  background: viewMode === 'module' ? '#1a1d28' : 'transparent',
+                  border: '1px solid var(--border-color)',
+                  borderBottom: viewMode === 'module' ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                  color: viewMode === 'module' ? '#fff' : 'var(--text-secondary)',
+                  fontSize: '0.76rem',
+                  fontWeight: viewMode === 'module' ? 700 : 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Layers size={13} style={{ color: 'var(--primary-color)' }} />
+                <span>Command Center (Home)</span>
+              </button>
+
+              {/* Open Record Tabs */}
+              {chartTabs.map(tab => {
+                const isActive = viewMode === 'chart' && activeChartTabId === tab.id;
+                return (
+                  <div
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveChartTabId(tab.id);
+                      setViewMode('chart');
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 12px',
+                      borderRadius: '6px 6px 0 0',
+                      background: isActive ? '#1a1d28' : 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--border-color)',
+                      borderBottom: isActive ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                      color: isActive ? '#fff' : 'var(--text-secondary)',
+                      fontSize: '0.76rem',
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span>{tab.type === 'property' ? '📍' : tab.type === 'permit' ? '📄' : tab.type === 'legislative' ? '🏛️' : '💼'} {tab.label}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCloseTab(tab.id);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 0,
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: '1px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </header>
         )}
@@ -845,6 +945,24 @@ function App() {
                     permits={permits}
                     inspections={inspections}
                   />
+                )}
+
+                {activeModule === 'city-pulse' && (
+                  <CityPulse 
+                    currentRole={currentRole}
+                    currentProfile={currentProfile}
+                    trackerItems={trackerItems}
+                    inspections={inspections}
+                    permits={permits}
+                  />
+                )}
+
+                {activeModule === 'knowledge-graph' && (
+                  <KnowledgeGraph />
+                )}
+
+                {activeModule === 'marketplace' && (
+                  <Marketplace />
                 )}
 
                 {activeModule === 'tracker' && (
@@ -984,6 +1102,13 @@ function App() {
                     addNotification={addNotification}
                   />
                 )}
+
+                {activeModule === 'platform-control' && (
+                  <PlatformControlCenter 
+                    currentProfile={currentProfile}
+                    addNotification={addNotification}
+                  />
+                )}
               </>
             ) : (
               <ChartingSystem 
@@ -1002,6 +1127,7 @@ function App() {
             currentRole={currentRole}
             activeChartTab={activeChartTab}
             addNotification={addNotification}
+            activeProduct={activeProduct}
           />
         </div>
       </main>
@@ -1012,6 +1138,68 @@ function App() {
   return (
     <>
       {content}
+      <UniversalSearchModal 
+        isOpen={isUniversalSearchOpen}
+        onClose={() => setIsUniversalSearchOpen(false)}
+        onOpenRecord={(type, id, targetWorkspace) => {
+          if (targetWorkspace) {
+            handleSelectWorkspace(targetWorkspace);
+          }
+          handleOpenChart(type, id);
+        }}
+        addNotification={addNotification}
+      />
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectWorkspace={handleSelectWorkspace}
+        onOpenRecord={(type, id, targetWorkspace) => {
+          if (targetWorkspace) {
+            handleSelectWorkspace(targetWorkspace);
+          }
+          handleOpenChart(type, id);
+        }}
+        onOpenCreateModal={(type) => {
+          if (type) setCreateModalInitialType(type);
+          setIsCreateModalOpen(true);
+        }}
+        addNotification={addNotification}
+      />
+      <NotificationCenterDrawer 
+        isOpen={isNotificationDrawerOpen}
+        onClose={() => setIsNotificationDrawerOpen(false)}
+        addNotification={addNotification}
+      />
+      <UniversalCreateModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        initialEntityType={createModalInitialType}
+        addNotification={addNotification}
+      />
+
+      {/* Munevo Canvas OS Floating Dynamic Dock */}
+      {viewMode !== 'marketing' && viewMode !== 'mobile-field' && (
+        <FloatingDock 
+          onGoHome={() => {
+            handleSelectWorkspace('core', 'command-center');
+            setViewMode('module');
+          }}
+          onOpenSearch={() => setIsCommandPaletteOpen(true)}
+          onOpenAI={() => addNotification('Sentinel AI Assistant ready. Ask any query via Cmd+K or chat.')}
+          onOpenGIS={() => {
+            handleSelectWorkspace('gis', 'gis');
+            setViewMode('module');
+          }}
+          onOpenCreate={() => setIsCreateModalOpen(true)}
+          onOpenNotifications={() => setIsNotificationDrawerOpen(!isNotificationDrawerOpen)}
+          onOpenControlCenter={() => {
+            handleSelectWorkspace('core', 'platform-control');
+            setViewMode('module');
+          }}
+          activeModule={activeModule}
+        />
+      )}
+
       <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {toasts.map(toast => (
           <div key={toast.id} className="toast">

@@ -330,10 +330,10 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
       <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>
-            Welcome to Munevo Workspace, <span className="brand-gradient-text">{getUserDisplayName()}</span>
+            Welcome to Munevo Command, <span className="brand-gradient-text">{getUserDisplayName()}</span>
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
-            Role Context: <strong>{currentProfile?.role?.name || currentRole.name}</strong> • Department: {currentRole.department}
+            Personalized Command Center • Role Context: <strong>{currentProfile?.role?.name || currentRole.name}</strong> • Department: {currentRole.department}
           </p>
         </div>
         <div style={{ padding: '6px 12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '6px', fontSize: '11px', color: 'var(--primary-color)', fontWeight: 600 }}>

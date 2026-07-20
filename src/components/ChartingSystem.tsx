@@ -30,12 +30,18 @@ import {
   Camera,
   Layers,
   Gavel,
-  FileCheck
+  FileCheck,
+  Building,
+  Wrench,
+  Droplet,
+  Users,
+  Briefcase,
+  FileDown
 } from 'lucide-react';
 
 export interface ChartTabItem {
   id: string;
-  type: 'property' | 'permit' | 'legislative' | 'business';
+  type: 'property' | 'permit' | 'legislative' | 'business' | 'project';
   label: string;
 }
 
@@ -44,7 +50,7 @@ interface ChartingSystemProps {
   activeTabId: string | null;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
-  onOpenChart: (type: 'property' | 'permit' | 'legislative' | 'business', id: string) => void;
+  onOpenChart: (type: 'property' | 'permit' | 'legislative' | 'business' | 'project', id: string) => void;
   currentProfile: any;
   addNotification: (message: string) => void;
 }
@@ -58,6 +64,9 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
   currentProfile,
   addNotification
 }) => {
+  // Store sub-tab active selections per open record ID to maintain workspace context
+  const [subTabs, setSubTabs] = useState<Record<string, string>>({});
+
   if (tabs.length === 0 || !activeTabId) {
     return (
       <div style={{
@@ -84,9 +93,9 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
           <FileText size={28} />
         </div>
         <div>
-          <h3 style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Chart Workspace Empty</h3>
+          <h3 style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Workspace Empty</h3>
           <p style={{ fontSize: '0.8rem', marginTop: '4px', maxWidth: '320px' }}>
-            Select a property from the GIS Map, click a ticket in the tracker, or open a record in the Command Center to open a persistent workspace chart.
+            Open a record from search, the GIS map, or Munevo Command to view it in the unified workspace.
           </p>
         </div>
       </div>
@@ -95,524 +104,322 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
+  const getSubTab = (id: string, defaultTab = 'summary') => {
+    return subTabs[id] || defaultTab;
+  };
+
+  const setSubTab = (id: string, value: string) => {
+    setSubTabs(prev => ({ ...prev, [id]: value }));
+  };
+
   // Render Property Chart content
   const renderPropertyChart = (id: string) => {
     const prop = PROPERTIES[id];
-    if (!prop) return <p>Property not found.</p>;
+    if (!prop) return <p style={{ padding: '20px' }}>Property not found.</p>;
 
-    // Find related records
     const propPermits = Object.values(PERMITS).filter(p => p.propertyId === id);
-    const activePermits = propPermits.filter(p => p.status !== 'Completed');
-    const previousPermits = propPermits.filter(p => p.status === 'Completed');
-
     const propViolations = Object.values(VIOLATIONS).filter(v => v.propertyId === id);
     const propInspections = Object.values(INSPECTIONS).filter(i => i.propertyId === id);
     const prop311 = TRACKER_ITEMS.filter(item => item.address === prop.address && item.module === '311');
 
-    const propLegs = LEGISLATIVE_ITEMS.filter(item => 
-      item.linkedEntities.some(ent => ent.type === 'Property' && ent.id === id)
-    );
+    const activeSub = getSubTab(id, 'summary');
 
-    // Mock payment records
-    const paymentsList = [
-      { id: 'PAY-1002', date: '2026-07-07', type: 'Utility Bill (Water)', amount: 84.50, status: 'Success' },
-      { id: 'PAY-0982', date: '2026-06-15', type: 'Property Tax Installment', amount: 3250.00, status: 'Success' },
-      { id: 'PAY-0841', date: '2026-05-02', type: 'Permit Fee (PM-2026-0182)', amount: 6200.00, status: 'Success' }
-    ];
-
-    // Mock redevelopment agreement details
-    const redevelopmentAgreement = id === 'prop_02' ? {
-      agreementNumber: 'RA-2025-0012',
-      title: 'Historic Restoration & Energy Retrofit Grant Agreement',
-      parties: 'City of Newark & Washington Street Development Partners LLC',
-      date: '2025-11-12',
-      status: 'Active (Under Compliance Review)'
-    } : null;
-
-    // Mock planning zoning board cases
-    const planningCases = [
-      { caseNumber: 'PL-2026-0043', board: 'Zoning Board of Adjustment', title: 'Setback Variance Approval for Auxiliary Mechanical Facade Netting Enclosure', date: '2026-05-10', status: 'Approved with Conditions' }
-    ].filter(() => id === 'prop_02'); // Only show for prop_02 to make it realistic
-
-    // Mock document lists
-    const documentFiles = [
-      { name: 'Approved_Site_Plan_Drawings.pdf', size: '14.2 MB', category: 'Permits', icon: FileText },
-      { name: 'Structural_Tuckpointing_Methodology.pdf', size: '2.8 MB', category: 'Inspections', icon: FileText },
-      { name: 'Water_Service_Backflow_Certificate.pdf', size: '840 KB', category: 'Utilities', icon: FileCheck }
+    const propertySubTabs = [
+      { id: 'summary', label: 'Summary' },
+      { id: 'parcel', label: 'Parcel & Ownership' },
+      { id: 'permits', label: 'Permits & Inspections' },
+      { id: 'violations', label: 'Violations & Code' },
+      { id: 'operations', label: '311 & Work Orders' },
+      { id: 'utilities', label: 'Utilities & Bills' },
+      { id: 'planning', label: 'Planning & Zoning' },
+      { id: 'documents', label: 'Documents & GIS' }
     ];
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Title Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Header banner with Digital Twin Badge & Timeline Scrubber */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '12px', padding: '14px 18px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="badge-status badge-success">Active Parcel</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Zoning: {prop.zoningDistrict}</span>
+              <span className="badge-status badge-success pulse-emerald">🏢 Digital Twin Property</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>UUID: {prop.id} • Newark Ward 2</span>
             </div>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '6px' }}>{prop.address}</h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Zip Code: {prop.zipCode}</span>
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: '4px' }}>{prop.address}</h3>
+          </div>
+
+          {/* Interactive Historical Timeline Scrubber (2020 - 2026) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '220px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+              <span>HISTORICAL SCRUBBER</span>
+              <span style={{ color: 'var(--primary-color)' }}>JULY 2026 (PRESENT)</span>
+            </div>
+            <input 
+              type="range" 
+              min="2020" 
+              max="2026" 
+              defaultValue="2026" 
+              className="timeline-scrubber"
+              onChange={(e) => addNotification(`Scrubbed Digital Twin state to year ${e.target.value}.`)}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+              <span>2020</span>
+              <span>2022</span>
+              <span>2024</span>
+              <span>2026</span>
+            </div>
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Assessed Land Value</span>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary-color)', marginTop: '2px' }}>
-              ${prop.assessedValue.toLocaleString()}
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Assessed Valuation</span>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--primary-color)', marginTop: '2px' }}>
+              $425,000
             </div>
           </div>
         </div>
 
-        {/* AI Chart Summary */}
-        <div style={{
-          background: 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.08)',
-          border: '1px dashed rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.25)',
-          borderRadius: '8px',
-          padding: '14px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px'
-        }}>
-          <Sparkles className="brand-gradient-text" size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-          <div style={{ fontSize: '0.8rem', lineHeight: '1.5' }}>
-            <strong style={{ color: 'var(--accent-color)' }}>Munevo AI Property Synthesis:</strong> This parcel holds {propPermits.length} building/electrical permits ({activePermits.length} active, {previousPermits.length} completed) and has {propViolations.length} active violations. The water account balance is ${prop.utilities.balance.toFixed(2)}. Legislative resolution <strong>LEG-2026-004</strong> is pending action relative to redevelopment grants here. 311 request queue has {prop311.length} entries.
-          </div>
+        {/* Horizontal Sub-tabs */}
+        <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px', overflowX: 'auto' }}>
+          {propertySubTabs.map(sub => (
+            <button
+              key={sub.id}
+              onClick={() => setSubTab(id, sub.id)}
+              style={{
+                background: 'transparent',
+                border: 0,
+                borderBottom: activeSub === sub.id ? '2px solid var(--primary-color)' : '2px solid transparent',
+                color: activeSub === sub.id ? '#fff' : 'var(--text-secondary)',
+                fontSize: '0.75rem',
+                fontWeight: activeSub === sub.id ? 700 : 500,
+                padding: '6px 12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {sub.label}
+            </button>
+          ))}
         </div>
 
-        <div className="property-grid">
-          {/* Main Info */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* Property information & Owner information */}
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Property Info & Owner Details</div>
-              </div>
-              <div className="property-details-list">
-                <div className="property-item">
-                  <span className="property-label">Registered Owner</span>
-                  <span className="property-value">{prop.ownerName}</span>
-                </div>
-                <div className="property-item">
-                  <span className="property-label">Owner Mailing Address</span>
-                  <span className="property-value">{prop.ownerAddress}</span>
-                </div>
-                <div className="property-item">
-                  <span className="property-label">Tax Account Status</span>
-                  <span className="property-value" style={{ color: prop.taxStatus === 'Paid' ? 'var(--success-text)' : 'var(--danger-text)' }}>
-                    {prop.taxStatus}
-                  </span>
-                </div>
-                <div className="property-item">
-                  <span className="property-label">Water Meter Acc #</span>
-                  <span className="property-value">{prop.utilities.waterAccountNumber} (Balance: ${prop.utilities.balance.toFixed(2)})</span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                <strong>Officer Notes:</strong> {prop.notes}
-              </p>
-            </div>
-
-            {/* Active & Previous Permits Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              <div className="glass-card">
-                <div className="card-header">
-                  <div className="card-title">Active Permits ({activePermits.length})</div>
-                </div>
-                <div className="list-queue">
-                  {activePermits.map(perm => (
-                    <div 
-                      key={perm.id} 
-                      className="queue-item"
-                      onClick={() => onOpenChart('permit', perm.id)}
-                      style={{ padding: '8px 12px' }}
-                    >
-                      <div className="queue-details">
-                        <span className="queue-title" style={{ fontSize: '0.8rem' }}>{perm.permitNumber} ({perm.type})</span>
-                        <span className="queue-sub" style={{ fontSize: '0.7rem' }}>Est: ${perm.estimatedCost.toLocaleString()}</span>
-                      </div>
-                      <span className="badge-status badge-primary" style={{ fontSize: '0.65rem' }}>
-                        {perm.status}
-                      </span>
-                    </div>
-                  ))}
-                  {activePermits.length === 0 && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '8px' }}>No active permits</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="glass-card">
-                <div className="card-header">
-                  <div className="card-title">Previous Permits ({previousPermits.length})</div>
-                </div>
-                <div className="list-queue">
-                  {previousPermits.map(perm => (
-                    <div 
-                      key={perm.id} 
-                      className="queue-item"
-                      onClick={() => onOpenChart('permit', perm.id)}
-                      style={{ padding: '8px 12px' }}
-                    >
-                      <div className="queue-details">
-                        <span className="queue-title" style={{ fontSize: '0.8rem' }}>{perm.permitNumber} ({perm.type})</span>
-                        <span className="queue-sub" style={{ fontSize: '0.7rem' }}>Completed: {perm.issuedDate || '2026'}</span>
-                      </div>
-                      <span className="badge-status badge-success" style={{ fontSize: '0.65rem' }}>
-                        Completed
-                      </span>
-                    </div>
-                  ))}
-                  {previousPermits.length === 0 && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '8px' }}>No previous permits registered</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 311 Requests Grid */}
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">
-                  <Layers size={14} style={{ color: 'var(--warning-text)' }} />
-                  <span>311 Service Requests ({prop311.length})</span>
-                </div>
-              </div>
-              <div className="list-queue">
-                {prop311.map(item => (
-                  <div key={item.id} className="queue-item" style={{ padding: '10px 14px' }}>
-                    <div className="queue-details">
-                      <span className="queue-title">{item.id}: {item.title}</span>
-                      <span className="queue-sub">Reporter: Resident • Date: {item.reportedDate}</span>
-                    </div>
-                    <span className={`badge-status ${item.status === 'In Progress' ? 'badge-warn' : 'badge-primary'}`}>
-                      {item.status}
+        {/* Tab content */}
+        <div style={{ marginTop: '4px' }}>
+          {activeSub === 'summary' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '16px' }}>
+              <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="card-title">Property Summary</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.8rem' }}>
+                  <div className="property-item">
+                    <span className="property-label">Primary Owner</span>
+                    <span className="property-value">{prop.ownerName}</span>
+                  </div>
+                  <div className="property-item">
+                    <span className="property-label">Occupancy Status</span>
+                    <span className="property-value" style={{ color: '#10b981' }}>Occupied (Verified)</span>
+                  </div>
+                  <div className="property-item">
+                    <span className="property-label">Total Permits Logged</span>
+                    <span className="property-value">{propPermits.length}</span>
+                  </div>
+                  <div className="property-item">
+                    <span className="property-label">Code Enforcement Violations</span>
+                    <span className="property-value" style={{ color: propViolations.length > 0 ? 'var(--danger-text)' : 'inherit' }}>
+                      {propViolations.length} Active
                     </span>
                   </div>
-                ))}
-                {prop311.length === 0 && (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '8px' }}>✓ No active 311 requests for this address</span>
+                </div>
+              </div>
+              <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div className="card-title">Quick Actions</div>
+                <button 
+                  className="ai-btn-send" 
+                  style={{ width: '100%', height: '32px', fontSize: '0.75rem' }}
+                  onClick={() => addNotification('Triggered structural re-inspection request.')}
+                >
+                  Schedule Safety Re-Inspection
+                </button>
+                <button 
+                  className="tab-btn" 
+                  style={{ width: '100%', height: '32px', fontSize: '0.75rem', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)', color: '#fff', borderRadius: '6px', cursor: 'pointer' }}
+                  onClick={() => onOpenChart('business', 'DCF Developers, LLC')}
+                >
+                  View Associated Business Profile
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeSub === 'parcel' && (
+            <div className="glass-card">
+              <div className="card-title">Tax Assessment & Parcel Info</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', fontSize: '0.8rem', marginTop: '10px' }}>
+                <div className="property-item">
+                  <span className="property-label">Block Number</span>
+                  <span className="property-value">102</span>
+                </div>
+                <div className="property-item">
+                  <span className="property-label">Lot Number</span>
+                  <span className="property-value">14</span>
+                </div>
+                <div className="property-item">
+                  <span className="property-label">Zoning Code</span>
+                  <span className="property-value">R-4 Multi-Family Residential</span>
+                </div>
+                <div className="property-item">
+                  <span className="property-label">Ward Region</span>
+                  <span className="property-value">Central Ward</span>
+                </div>
+                <div className="property-item">
+                  <span className="property-label">Tax District</span>
+                  <span className="property-value">Council District 2</span>
+                </div>
+                <div className="property-item">
+                  <span className="property-label">Address Normalization</span>
+                  <span className="property-value">{prop.address}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSub === 'permits' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="glass-card">
+                <div className="card-title">Building Permits ({propPermits.length})</div>
+                <div className="list-queue">
+                  {propPermits.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '10px' }}>No permits logged.</div>
+                  ) : (
+                    propPermits.map(p => (
+                      <div key={p.id} className="queue-item" onClick={() => onOpenChart('permit', p.id)}>
+                        <div className="queue-details">
+                          <span className="queue-title">{p.permitNumber} ({p.type})</span>
+                          <span className="queue-sub">Submitted: {p.submittedDate} • Value: ${p.estimatedCost.toLocaleString()}</span>
+                        </div>
+                        <span className={`badge-status ${p.status === 'Completed' ? 'badge-success' : 'badge-primary'}`}>
+                          {p.status}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="glass-card">
+                <div className="card-title">Field Inspection Logs ({propInspections.length})</div>
+                <div className="list-queue">
+                  {propInspections.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '10px' }}>No inspections logged.</div>
+                  ) : (
+                    propInspections.map(i => (
+                      <div key={i.id} className="queue-item">
+                        <div className="queue-details">
+                          <span className="queue-title">{i.type}</span>
+                          <span className="queue-sub">Inspector: {i.inspectorName} • Date: {i.scheduledDate}</span>
+                        </div>
+                        <span className={`badge-status ${i.status === 'Passed' ? 'badge-success' : 'badge-danger'}`}>
+                          {i.status}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSub === 'violations' && (
+            <div className="glass-card">
+              <div className="card-title">Code Enforcement Violations ({propViolations.length})</div>
+              <div className="list-queue">
+                {propViolations.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '10px' }}>No active violations.</div>
+                ) : (
+                  propViolations.map(v => (
+                    <div key={v.id} className="queue-item">
+                      <div className="queue-details">
+                        <span className="queue-title" style={{ color: 'var(--danger-text)' }}>{v.caseNumber} • {v.violationType}</span>
+                        <span className="queue-sub">{v.description} • Fines Outstanding: ${v.fineAmount}</span>
+                      </div>
+                      <span className={`badge-status ${v.status === 'Abated' ? 'badge-success' : 'badge-danger'}`}>
+                        {v.status}
+                      </span>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
+          )}
 
-            {/* Inspections & Violations Registries */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '20px' }}>
+          {activeSub === 'operations' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="glass-card">
-                <div className="card-header">
-                  <div className="card-title">Inspections Log</div>
-                </div>
-                <div className="tracker-table-container">
-                  <table className="tracker-table" style={{ fontSize: '0.75rem' }}>
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Type</th>
-                        <th>Inspector</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {propInspections.map(insp => (
-                        <tr key={insp.id}>
-                          <td style={{ fontWeight: 'bold' }}>{insp.id}</td>
-                          <td>{insp.type}</td>
-                          <td>{insp.inspectorName}</td>
-                          <td>
-                            <span className={`badge-status ${insp.status === 'Passed' ? 'badge-success' : insp.status === 'Failed' ? 'badge-danger' : 'badge-warn'}`} style={{ fontSize: '0.6rem' }}>
-                              {insp.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="glass-card">
-                <div className="card-header">
-                  <div className="card-title">Code Violations ({propViolations.length})</div>
-                </div>
+                <div className="card-title">Constituent 311 Reports ({prop311.length})</div>
                 <div className="list-queue">
-                  {propViolations.map(viol => (
-                    <div key={viol.id} className="queue-item" style={{ padding: '8px 12px', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-                      <div className="queue-details">
-                        <span className="queue-title" style={{ fontSize: '0.8rem', color: 'var(--danger-text)' }}>{viol.caseNumber}</span>
-                        <span className="queue-sub" style={{ fontSize: '0.7rem' }}>{viol.violationType} • Fine: ${viol.fineAmount}</span>
-                      </div>
-                      <span className="badge-status badge-danger" style={{ fontSize: '0.65rem' }}>
-                        {viol.status}
-                      </span>
-                    </div>
-                  ))}
-                  {propViolations.length === 0 && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '8px' }}>✓ No outstanding code violations</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Utility Accounts & Payments */}
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Utility Billing & Payments History</div>
-              </div>
-              <div className="tracker-table-container">
-                <table className="tracker-table" style={{ fontSize: '0.75rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Transaction ID</th>
-                      <th>Date</th>
-                      <th>Type / Reference</th>
-                      <th>Amount</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paymentsList.map(pay => (
-                      <tr key={pay.id}>
-                        <td style={{ fontWeight: 'bold', color: 'var(--text-secondary)' }}>{pay.id}</td>
-                        <td>{pay.date}</td>
-                        <td>{pay.type}</td>
-                        <td style={{ fontWeight: 'bold' }}>${pay.amount.toFixed(2)}</td>
-                        <td>
-                          <span className="badge-status badge-success" style={{ fontSize: '0.6rem' }}>{pay.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Legislative actions, Redevelopment agreements & Planning cases */}
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Legislative & Planning Actions</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Legislative Actions */}
-                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-color)', marginBottom: '6px' }}>
-                    <Gavel size={14} />
-                    <span>Linked Council Agendas ({propLegs.length})</span>
-                  </div>
-                  {propLegs.map(leg => (
-                    <div 
-                      key={leg.id}
-                      onClick={() => onOpenChart('legislative', leg.id)}
-                      style={{ fontSize: '0.75rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', margin: '4px 0' }}
-                    >
-                      <span style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>{leg.id} (Agenda {leg.agendaNumber})</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{leg.title.substring(0, 45)}...</span>
-                    </div>
-                  ))}
-                  {propLegs.length === 0 && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No pending legislative items associated.</span>
-                  )}
-                </div>
-
-                {/* Redevelopment Agreements */}
-                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary-color)', display: 'block', marginBottom: '6px' }}>
-                    Redevelopment Agreements (RDA)
-                  </span>
-                  {redevelopmentAgreement ? (
-                    <div style={{ fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div><strong>Agreement ID:</strong> {redevelopmentAgreement.agreementNumber}</div>
-                      <div><strong>Agreement Name:</strong> {redevelopmentAgreement.title}</div>
-                      <div><strong>Signing Parties:</strong> {redevelopmentAgreement.parties}</div>
-                      <div><strong>Approval Date:</strong> {redevelopmentAgreement.date} • <span style={{ color: 'var(--success-text)' }}>{redevelopmentAgreement.status}</span></div>
-                    </div>
+                  {prop311.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '10px' }}>No active 311 cases.</div>
                   ) : (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No redevelopment agreements active for this parcel.</span>
-                  )}
-                </div>
-
-                {/* Planning Cases */}
-                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary-color)', display: 'block', marginBottom: '6px' }}>
-                    Planning & Zoning Board Cases
-                  </span>
-                  {planningCases.map(planCase => (
-                    <div key={planCase.caseNumber} style={{ fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div><strong>Zoning Case #:</strong> {planCase.caseNumber} • {planCase.board}</div>
-                      <div><strong>Title:</strong> {planCase.title}</div>
-                      <div><strong>Decision Date:</strong> {planCase.date} • <span style={{ color: 'var(--success-text)' }}>{planCase.status}</span></div>
-                    </div>
-                  ))}
-                  {planningCases.length === 0 && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No active or previous planning cases.</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Documents & Photos */}
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Documents Vault & Photo Gallery</div>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '16px' }}>
-                {/* Documents list */}
-                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '8px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>MIME-Verified Attachments</span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {documentFiles.map((doc, idx) => {
-                      const Icon = doc.icon;
-                      return (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.75rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                            <Icon size={12} style={{ color: 'var(--primary-color)', flexShrink: 0 }} />
-                            <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={doc.name}>{doc.name}</span>
-                          </div>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{doc.size}</span>
+                    prop311.map(item => (
+                      <div key={item.id} className="queue-item" onClick={() => onOpenChart('permit', 'perm_03')}>
+                        <div className="queue-details">
+                          <span className="queue-title">{item.title}</span>
+                          <span className="queue-sub">Reported: {item.reportedDate} • Assigned to: {item.assignedTo}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Building Photos Section (Rich SVG drawing representing the facade photos) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Latest Photo Site Inspection</span>
-                  <div style={{ 
-                    height: '110px', 
-                    background: 'radial-gradient(circle at center, #1b2640 0%, #0d1326 100%)', 
-                    borderRadius: '8px', 
-                    border: '1px solid var(--border-color)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}>
-                    {/* SVG representation of the building */}
-                    <svg viewBox="0 0 100 100" style={{ width: '80px', height: '80px' }}>
-                      {/* Sky */}
-                      <rect width="100" height="100" fill="transparent"/>
-                      {/* Sun */}
-                      <circle cx="80" cy="20" r="8" fill="var(--warning-text)" opacity="0.3"/>
-                      {/* Ground */}
-                      <rect x="0" y="80" width="100" height="20" fill="var(--border-color)"/>
-                      {/* Building Facade */}
-                      <rect x="25" y="30" width="50" height="50" fill="rgba(var(--tenant-hue), var(--tenant-sat), 30%, 0.5)" stroke="var(--primary-color)" strokeWidth="1.5"/>
-                      {/* Roof */}
-                      <polygon points="20,30 50,10 80,30" fill="rgba(var(--accent-hue), var(--accent-sat), 30%, 0.6)" stroke="var(--accent-color)" strokeWidth="1.5"/>
-                      {/* Windows */}
-                      <rect x="35" y="40" width="10" height="10" fill="rgba(255,255,255,0.15)" stroke="var(--primary-color)" strokeWidth="0.8"/>
-                      <rect x="55" y="40" width="10" height="10" fill="rgba(255,255,255,0.15)" stroke="var(--primary-color)" strokeWidth="0.8"/>
-                      <rect x="35" y="60" width="10" height="10" fill="rgba(255,255,255,0.15)" stroke="var(--primary-color)" strokeWidth="0.8"/>
-                      <rect x="55" y="60" width="10" height="10" fill="rgba(255,255,255,0.15)" stroke="var(--primary-color)" strokeWidth="0.8"/>
-                      {/* Door */}
-                      <rect x="46" y="65" width="8" height="15" fill="var(--accent-color)" opacity="0.8"/>
-                    </svg>
-                    <div style={{ position: 'absolute', bottom: '4px', right: '4px', fontSize: '0.55rem', background: 'rgba(0,0,0,0.6)', padding: '2px 4px', borderRadius: '2px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                      <Camera size={8} />
-                      <span>Facade_View_July_2026.jpg</span>
-                    </div>
-                  </div>
+                        <span className="badge-status badge-primary">{item.status}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Right Column: GIS Map & Timeline */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* GIS Map segment */}
-            <div className="glass-card" style={{ padding: '16px' }}>
-              <div className="card-header" style={{ marginBottom: '10px' }}>
-                <div className="card-title">
-                  <MapPin className="brand-gradient-text" size={14} />
-                  <span>GIS Micro Parcel Map</span>
+          {activeSub === 'utilities' && (
+            <div className="glass-card">
+              <div className="card-title">Water & Sewer Utility Accounts</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.75rem', marginTop: '10px' }}>
+                <div style={{ padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontWeight: 700, color: '#fff', display: 'block' }}>Account W-90234 (Municipal Water Service)</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Status: Active • Current Meter Reading: 3,420 CF</span>
+                  </div>
+                  <span style={{ color: 'var(--warning-text)', fontWeight: 700 }}>$84.50 Outstanding</span>
                 </div>
               </div>
-              <div style={{ 
-                height: '180px', 
-                background: 'radial-gradient(circle at center, #0f182c 0%, #060a14 100%)', 
-                borderRadius: '8px', 
-                border: '1px solid var(--border-color)',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                <svg viewBox="0 0 200 200" style={{ width: '100%', height: '100%' }}>
-                  {/* Street grids */}
-                  <line x1="100" y1="0" x2="100" y2="200" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="12" />
-                  <line x1="0" y1="120" x2="200" y2="120" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="10" />
-                  
-                  {/* Surrounding parcels */}
-                  <rect x="20" y="30" width="30" height="35" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
-                  <rect x="55" y="30" width="30" height="35" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
-                  <rect x="115" y="30" width="30" height="35" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
-                  <rect x="150" y="30" width="30" height="35" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
+            </div>
+          )}
 
-                  {/* Target property parcel highlighted */}
-                  <rect 
-                    x="115" 
-                    y="135" 
-                    width="45" 
-                    height="45" 
-                    fill="rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.3)" 
-                    stroke="var(--accent-color)" 
-                    strokeWidth="1.5" 
-                    style={{ filter: 'drop-shadow(0 0 6px var(--primary-glow))' }}
-                  />
-                  
-                  {/* Neighbouring parcel */}
-                  <rect x="55" y="135" width="35" height="45" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
-                  <rect x="20" y="135" width="30" height="45" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
-                  
-                  {/* Labels */}
-                  <text x="137" y="160" fill="#fff" fontSize="6px" fontWeight="bold" textAnchor="middle">TARGET</text>
-                  <text x="137" y="168" fill="var(--text-secondary)" fontSize="5px" textAnchor="middle">PARCEL</text>
-                  <text x="104" y="60" fill="var(--text-muted)" fontSize="4.5px" transform="rotate(90, 104, 60)">BROAD STREET</text>
-                  <text x="35" y="117" fill="var(--text-muted)" fontSize="4.5px">MARKET STREET</text>
-                </svg>
+          {activeSub === 'planning' && (
+            <div className="glass-card">
+              <div className="card-title">Planning & Zoning Board Decisions</div>
+              <div style={{ padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem', marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#fff' }}>
+                  <span>Zoning Setback Variance Case PL-2026-0043</span>
+                  <span style={{ color: '#10b981' }}>Approved</span>
+                </div>
+                <span style={{ color: 'var(--text-secondary)' }}>Scope: Setback Variance Approval for Auxiliary Mechanical Facade Netting Enclosure. Signed off: 2026-05-10.</span>
               </div>
             </div>
+          )}
 
-            {/* Activity Timeline */}
-            <div className="glass-card" style={{ height: 'fit-content' }}>
-              <div className="card-header">
-                <div className="card-title">Development Timeline</div>
-              </div>
-              <div className="timeline">
-                {propInspections.map(insp => (
-                  <div key={insp.id} className="timeline-item">
-                    <div className={`timeline-node ${insp.status === 'Passed' ? 'success' : insp.status === 'Failed' ? 'danger' : 'warn'}`} />
-                    <div className="timeline-info">
-                      <span className="timeline-date">{insp.scheduledDate} • {insp.inspectorName}</span>
-                      <span className="timeline-title">{insp.type} Inspection ({insp.status})</span>
-                      <span className="timeline-desc">{insp.notes}</span>
+          {activeSub === 'documents' && (
+            <div className="glass-card">
+              <div className="card-title">Property Documents Vault</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '10px' }}>
+                {[
+                  { name: 'Approved_Site_Plan_Drawings.pdf', size: '14.2 MB' },
+                  { name: 'Structural_Tuckpointing_Methodology.pdf', size: '2.8 MB' },
+                  { name: 'Water_Service_Backflow_Certificate.pdf', size: '840 KB' }
+                ].map((doc, idx) => (
+                  <div key={idx} style={{ padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileText size={14} style={{ color: 'var(--primary-color)' }} />
+                      <span style={{ fontWeight: 600, color: '#fff' }}>{doc.name}</span>
                     </div>
-                  </div>
-                ))}
-                {propPermits.map(perm => (
-                  <div key={perm.id} className="timeline-item">
-                    <div className="timeline-node success" />
-                    <div className="timeline-info">
-                      <span className="timeline-date">{perm.submittedDate}</span>
-                      <span className="timeline-title">Permit Filed: {perm.permitNumber}</span>
-                      <span className="timeline-desc">{perm.description}</span>
-                    </div>
-                  </div>
-                ))}
-                {prop311.map(item => (
-                  <div key={item.id} className="timeline-item">
-                    <div className="timeline-node warn" />
-                    <div className="timeline-info">
-                      <span className="timeline-date">{item.reportedDate}</span>
-                      <span className="timeline-title">311 Incident: {item.id}</span>
-                      <span className="timeline-desc">{item.title}</span>
-                    </div>
+                    <button style={{ background: 'transparent', border: 0, padding: 0, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                      <FileDown size={12} />
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
-
-          </div>
+          )}
         </div>
       </div>
     );
@@ -621,7 +428,7 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
   // Render Permit Chart content
   const renderPermitChart = (id: string) => {
     const perm = PERMITS[id];
-    if (!perm) return <p>Permit not found.</p>;
+    if (!perm) return <p style={{ padding: '20px' }}>Permit not found.</p>;
 
     const prop = PROPERTIES[perm.propertyId];
 
@@ -712,7 +519,7 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
           </div>
         </div>
 
-        {/* Detailed details */}
+        {/* Scope and audit info */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
           <div className="glass-card">
             <div className="card-header">
@@ -769,7 +576,7 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
   // Render Legislative Meeting Agenda Chart
   const renderLegislativeChart = (id: string) => {
     const leg = LEGISLATIVE_ITEMS.find(item => item.id === id);
-    if (!leg) return <p>Legislative item not found.</p>;
+    if (!leg) return <p style={{ padding: '20px' }}>Legislative item not found.</p>;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -845,106 +652,121 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
 
   // Render Business Chart content (for DCF Developers, LLC etc.)
   const renderBusinessChart = (id: string) => {
+    const activeSub = getSubTab(id, 'summary');
+
+    const businessSubTabs = [
+      { id: 'summary', label: 'Summary' },
+      { id: 'locations', label: 'Locations' },
+      { id: 'permits', label: 'Licenses & Permits' },
+      { id: 'inspections', label: 'Inspections & Compliance' },
+      { id: 'contracts', label: 'Contracts & Documents' }
+    ];
+
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Title Header */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="badge-status badge-success">Registered Developer</span>
+              <span className="badge-status badge-success">Registered Business UDM</span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sector: Real Estate & Construction</span>
             </div>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '6px' }}>{id}</h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Corporate ID: CORP-2024-8931</span>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginTop: '6px' }}>{id}</h3>
           </div>
-
           <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Corporate Compliance Rating</span>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success-text)', marginTop: '2px' }}>
-              Grade A (Passed)
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Compliance Rating</span>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success-text)', marginTop: '2px' }}>
+              Grade A
             </div>
           </div>
         </div>
 
-        {/* AI Briefing */}
-        <div style={{
-          background: 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.08)',
-          border: '1px dashed rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.25)',
-          borderRadius: '8px',
-          padding: '14px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px'
-        }}>
-          <Sparkles className="brand-gradient-text" size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-          <div style={{ fontSize: '0.8rem', lineHeight: '1.5' }}>
-            <strong style={{ color: 'var(--accent-color)' }}>Munevo AI Developer Synthesis:</strong> **DCF Developers, LLC** is active in the **West Ward Redevelopment Project**. They currently own properties at **125 Market St** and **129 Market St**. Active building permit **BP-2026-0145** is logged. Initial Site Inspection passed successfully on 2026-06-01. Resolution **26-0356** is pending action for redevelopment contract approvals.
-          </div>
+        {/* Subtabs */}
+        <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px', overflowX: 'auto' }}>
+          {businessSubTabs.map(sub => (
+            <button
+              key={sub.id}
+              onClick={() => setSubTab(id, sub.id)}
+              style={{
+                background: 'transparent',
+                border: 0,
+                borderBottom: activeSub === sub.id ? '2px solid var(--primary-color)' : '2px solid transparent',
+                color: activeSub === sub.id ? '#fff' : 'var(--text-secondary)',
+                fontSize: '0.75rem',
+                fontWeight: activeSub === sub.id ? 700 : 500,
+                padding: '6px 12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {sub.label}
+            </button>
+          ))}
         </div>
 
-        {/* 2-Column Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* Properties & Projects Checklist */}
-            <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Interconnected Related Records</div>
+        <div style={{ marginTop: '4px' }}>
+          {activeSub === 'summary' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{
+                background: 'rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.08)',
+                border: '1px dashed rgba(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.25)',
+                borderRadius: '8px',
+                padding: '14px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <Sparkles className="brand-gradient-text" size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div style={{ fontSize: '0.8rem', lineHeight: '1.5' }}>
+                  <strong style={{ color: 'var(--accent-color)' }}>Munevo AI Developer Synthesis:</strong> **DCF Developers, LLC** is active in the **West Ward Redevelopment Project**. They currently own properties at **125 Market St** and **129 Market St**. Active building permit **BP-2026-0145** is logged. Initial Site Inspection passed successfully on 2026-06-01. Resolution **26-0356** is pending action for redevelopment contract approvals.
+                </div>
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.8rem' }}>
-                {/* Properties */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>PROPERTIES OWNED</span>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button 
-                      onClick={() => onOpenChart('property', 'prop_05')}
-                      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', color: 'var(--primary-color)', textDecoration: 'underline', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
-                    >
-                      125 Market Street
-                    </button>
-                    <button 
-                      onClick={() => onOpenChart('property', 'prop_06')}
-                      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', color: 'var(--primary-color)', textDecoration: 'underline', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
-                    >
-                      129 Market Street
-                    </button>
+              <div className="glass-card" style={{ fontSize: '0.8rem' }}>
+                <div className="card-title">Registration Details</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+                  <div className="property-item">
+                    <span className="property-label">Entity Status</span>
+                    <span className="property-value" style={{ color: '#10b981' }}>Active / Compliant</span>
                   </div>
-                </div>
-
-                {/* Project */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>ACTIVE PROJECT ASSOCIATION</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>✓ West Ward Redevelopment Project</span>
-                </div>
-
-                {/* Department */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>SPONSORING DEPARTMENT</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>✓ Economic & Housing Development</span>
-                </div>
-
-                {/* Planning */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>PLANNING DECISIONS</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>✓ Site Plan Approval (Zoning Case PL-2026-0043) - Approved</span>
+                  <span className="property-item">
+                    <span className="property-label">Business Registration #</span>
+                    <span className="property-value">CORP-2024-8931</span>
+                  </span>
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Permits & Inspections Table */}
+          {activeSub === 'locations' && (
             <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Permits & Inspections Checklist</div>
+              <div className="card-title">Properties Owned / Storefronts</div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button 
+                  onClick={() => onOpenChart('property', 'prop_05')}
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', color: 'var(--primary-color)', textDecoration: 'underline', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                >
+                  125 Market Street
+                </button>
+                <button 
+                  onClick={() => onOpenChart('property', 'prop_06')}
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', color: 'var(--primary-color)', textDecoration: 'underline', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                >
+                  129 Market Street
+                </button>
               </div>
+            </div>
+          )}
+
+          {activeSub === 'permits' && (
+            <div className="glass-card">
+              <div className="card-title">Associated Permits & Licenses</div>
               <div className="tracker-table-container">
-                <table className="tracker-table" style={{ fontSize: '0.75rem' }}>
+                <table className="tracker-table" style={{ fontSize: '0.75rem', marginTop: '10px' }}>
                   <thead>
                     <tr>
                       <th>Record Type</th>
                       <th>Ref Number</th>
-                      <th>Task / Purpose</th>
+                      <th>Purpose</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -957,10 +779,30 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
                         <span className="badge-status badge-primary" style={{ fontSize: '0.65rem' }}>Issued</span>
                       </td>
                     </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeSub === 'inspections' && (
+            <div className="glass-card">
+              <div className="card-title">Safety Inspections History</div>
+              <div className="tracker-table-container">
+                <table className="tracker-table" style={{ fontSize: '0.75rem', marginTop: '10px' }}>
+                  <thead>
                     <tr>
-                      <td style={{ fontWeight: 'bold' }}>Safety Inspection</td>
+                      <th>Record ID</th>
+                      <th>Purpose</th>
+                      <th>Inspector</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
                       <td>insp_06</td>
                       <td>Initial Site Inspection (Passed on 2026-06-01)</td>
+                      <td>Elena Rostova</td>
                       <td>
                         <span className="badge-status badge-success" style={{ fontSize: '0.65rem' }}>Passed</span>
                       </td>
@@ -969,17 +811,12 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
                 </table>
               </div>
             </div>
+          )}
 
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* Documents Vault */}
+          {activeSub === 'contracts' && (
             <div className="glass-card">
-              <div className="card-header">
-                <div className="card-title">Legislative Documents Vault</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem' }}>
+              <div className="card-title">Developer Contracts Vault</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem', marginTop: '10px' }}>
                 <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>✓ Redevelopment Agreement</span>
                   <span style={{ fontSize: '0.65rem', color: 'var(--success-text)' }}>RDA-2025-0012</span>
@@ -991,54 +828,145 @@ export const ChartingSystem: React.FC<ChartingSystemProps> = ({
                   <span style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>✓ Council Resolution</span>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>RES-2026-0356</span>
                 </div>
-                <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>✓ Meeting Minutes</span>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Agenda IX.B.2</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render Project Workspace (Munevo Capital Projects)
+  const renderProjectChart = (id: string) => {
+    const activeSub = getSubTab(id, 'summary');
+    const isFacade = id === 'proj_02';
+
+    const projectSubTabs = [
+      { id: 'summary', label: 'Summary' },
+      { id: 'properties', label: 'Properties Linked' },
+      { id: 'funding', label: 'Funding & Contracts' },
+      { id: 'milestones', label: 'Milestones & Tasks' }
+    ];
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="badge-status badge-primary">Capital Infra Project</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Code: {isFacade ? 'PROJ-FAC-01' : 'PROJ-WAT-02'}</span>
+            </div>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginTop: '4px' }}>
+              {isFacade ? 'Washington St Facade Grants Program' : 'Ferry Street Water Line Relining'}
+            </h3>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Overall Progress</span>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary-color)', marginTop: '2px' }}>
+              {isFacade ? '35% Active' : '75% Complete'}
+            </div>
+          </div>
+        </div>
+
+        {/* Subtabs */}
+        <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px', overflowX: 'auto' }}>
+          {projectSubTabs.map(sub => (
+            <button
+              key={sub.id}
+              onClick={() => setSubTab(id, sub.id)}
+              style={{
+                background: 'transparent',
+                border: 0,
+                borderBottom: activeSub === sub.id ? '2px solid var(--primary-color)' : '2px solid transparent',
+                color: activeSub === sub.id ? '#fff' : 'var(--text-secondary)',
+                fontSize: '0.75rem',
+                fontWeight: activeSub === sub.id ? 700 : 500,
+                padding: '6px 12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {sub.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ marginTop: '4px' }}>
+          {activeSub === 'summary' && (
+            <div className="glass-card" style={{ fontSize: '0.8rem' }}>
+              <div className="card-title">Project Scope Description</div>
+              <p style={{ marginTop: '8px', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                {isFacade 
+                  ? 'Providing structural improvements, exterior facades remediation, and energy retrofit grants to properties along the Washington Street corridor.'
+                  : 'Upgrading the municipal water booster pumps and relining the major sewer mains along the Ferry Street corridor to guarantee PSI pressure compliance.'
+                }
+              </p>
+            </div>
+          )}
+
+          {activeSub === 'properties' && (
+            <div className="glass-card">
+              <div className="card-title">Properties Linked to Project</div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button 
+                  onClick={() => onOpenChart('property', isFacade ? 'prop_02' : 'prop_03')}
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', color: 'var(--primary-color)', textDecoration: 'underline', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                >
+                  {isFacade ? '15 Washington St' : '42 Ferry St'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeSub === 'funding' && (
+            <div className="glass-card">
+              <div className="card-title">Funding Allocations & Contracts</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.75rem', marginTop: '10px' }}>
+                <div style={{ padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontWeight: 700, color: '#fff', display: 'block' }}>Resolution Allocation RES-2026-004</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Sponsor: Redevelopment Agency</span>
+                  </div>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>$35,000 Allocated</span>
                 </div>
               </div>
             </div>
+          )}
 
-          </div>
-
+          {activeSub === 'milestones' && (
+            <div className="glass-card">
+              <div className="card-title">Project Milestones & Task Checklist</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem', marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <span>Task 1: Civil engineering site survey checklist</span>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>✓ Completed</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <span>Task 2: Procurement of structural materials</span>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>✓ Completed</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                  <span>Task 3: Phase 1 onsite masonry excavation</span>
+                  <span style={{ color: 'var(--warning-text)', fontWeight: 700 }}>In Progress</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="chart-workspace-container">
-      {/* Workspace Tabs Header */}
-      <div className="chart-tabs-header">
-        {tabs.map((tab) => {
-          const isActive = tab.id === activeTabId;
-          return (
-            <div 
-              key={tab.id} 
-              className={`chart-tab ${isActive ? 'active' : ''}`}
-              onClick={() => onSelectTab(tab.id)}
-            >
-              <span>{tab.label}</span>
-              <div 
-                className="tab-close" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCloseTab(tab.id);
-                }}
-              >
-                <X size={10} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
+    <div className="chart-workspace-container" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Chart Content Area with Side-by-Side message thread */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div className="chart-content" style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%' }}>
+        <div className="chart-content" style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
           {activeTab?.type === 'property' && renderPropertyChart(activeTab.id)}
           {activeTab?.type === 'permit' && renderPermitChart(activeTab.id)}
           {activeTab?.type === 'legislative' && renderLegislativeChart(activeTab.id)}
           {activeTab?.type === 'business' && renderBusinessChart(activeTab.id)}
+          {activeTab?.type === 'project' && renderProjectChart(activeTab.id)}
         </div>
         
         {activeTab && (

@@ -122,8 +122,13 @@ export const MobileFieldView: React.FC<MobileFieldViewProps> = ({
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h4 style={{ margin: 0, fontWeight: 800, fontSize: '0.9rem' }}>Munevo Go Field Ops</h4>
-            <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Logged in: {currentProfile.email}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <h4 style={{ margin: 0, fontWeight: 800, fontSize: '0.9rem' }}>Munevo Field Ops Mobile</h4>
+              <span style={{ fontSize: '8px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 700 }}>
+                ONLINE
+              </span>
+            </div>
+            <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Logged in: {currentProfile?.email || 'field-user'}</span>
           </div>
         </div>
         <button 
@@ -134,10 +139,16 @@ export const MobileFieldView: React.FC<MobileFieldViewProps> = ({
         </button>
       </div>
 
-      {/* Welcome Banner */}
-      <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: '8px', padding: '12px' }}>
-        <span style={{ fontSize: '10px', color: '#60a5fa', fontWeight: 'bold', textTransform: 'uppercase' }}>Field Schedule Today</span>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '2px 0 0 0' }}>Newark Enforcement Route</h3>
+      {/* Offline & Route Status Banner */}
+      <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <span style={{ fontSize: '10px', color: '#60a5fa', fontWeight: 'bold', textTransform: 'uppercase' }}>Field Schedule Today</span>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '2px 0 0 0' }}>Newark Operational Route</h3>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)', display: 'block' }}>Offline Queue</span>
+          <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 700 }}>0 Pending Sync</span>
+        </div>
       </div>
 
       {/* Task List */}
