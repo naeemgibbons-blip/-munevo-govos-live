@@ -234,7 +234,7 @@ export const WorkspaceHome: React.FC<WorkspaceHomeProps> = ({
       minHeight: '100vh',
       background: 'radial-gradient(circle at 50% 0%, #161b2a 0%, #0b0d14 70%)',
       color: '#fff',
-      padding: '28px 36px 100px 36px',
+      padding: '28px 36px 140px 36px',
       display: 'flex',
       flexDirection: 'column',
       gap: '32px',

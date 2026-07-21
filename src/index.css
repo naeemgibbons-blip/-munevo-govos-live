@@ -90,11 +90,17 @@
   scrollbar-color: var(--border-color) transparent;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
 body {
   font-family: var(--font-body);
   background-color: var(--bg-app);
   color: var(--text-primary);
-  overflow: hidden;
+  overflow-y: auto;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -120,10 +126,22 @@ h1, h2, h3, h4, h5, h6 {
 /* Layout Framework */
 .app-container {
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
   width: 100vw;
   background-color: var(--bg-app);
-  overflow: hidden;
+  overflow-y: auto;
+}
+
+.workspace-home-container {
+  min-height: 100vh;
+  overflow-y: auto !important;
+  padding-bottom: 140px !important;
+}
+
+.command-center-dense {
+  min-height: 100vh;
+  overflow-y: auto !important;
+  padding-bottom: 140px !important;
 }
 
 /* Sidebar Styling */

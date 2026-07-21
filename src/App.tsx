@@ -181,15 +181,11 @@ function App() {
     return () => subscription.unsubscribe();
   }, [supabaseReady]);
 
-  // Dynamically toggle body overflow scroll locks based on active viewMode
+  // Dynamically ensure body overflow allows scrolling
   useEffect(() => {
-    if (viewMode === 'marketing') {
-      document.body.style.overflow = 'auto';
-    } else {
-      document.body.style.overflow = 'hidden';
-    }
+    document.body.style.overflow = 'auto';
     return () => {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = 'auto';
     };
   }, [viewMode]);
 
@@ -585,8 +581,8 @@ function App() {
     );
   } else {
     content = (
-      <div className="app-container" style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <main className="main-panel" role="main" aria-label="Munevo Government OS Platform Workspace" style={{ flex: 1, width: '100%' }}>
+      <div className="app-container" style={{ width: '100vw', minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <main className="main-panel" role="main" aria-label="Munevo Government OS Platform Workspace" style={{ flex: 1, width: '100%', overflowY: 'auto' }}>
         {['resident', 'business', 'contractor'].includes(currentRole.id) ? (
           <header className="dashboard-header" style={{
             background: '#16181d',
