@@ -2077,15 +2077,42 @@ app.get('/api/sentinel/signals', async (req, res) => {
 });
 
 // 41. POST /api/sentinel/signals/:id/verify: Verify or Discard Sentinel Signal
-app.post('/api/sentinel/signals/:id/verify', async (req, res) => {
-  const { id } = req.params;
-  const { status, action } = req.body; // status: VERIFIED | DISCARDED | DUPLICATE
+// 42. GET /api/sentinel/cameras: Return list of public & authorized camera feeds
+app.get('/api/sentinel/cameras', async (req, res) => {
   let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    res.json([
+      { id: 'CAM-NWK-101', name: 'Broad St & Market St - North', agency: 'NJ DOT 511 Feed', location: 'Broad St & Market St (Downtown Newark)', address: '920 Broad St, Newark, NJ', ward: 'Central Ward', lat: 40.7357, lng: -74.1724, health: 'ONLINE', fps: 30, aiStatus: 'ACTIVE_ALERT', aiDetection: 'Heavy Pedestrian Congestion & Vehicle Backup', confidence: 92, riskLevel: 'MEDIUM', streamUrl: 'https://images.unsplash.com/photo-1577083552431-6e5fd01aa342?w=800&auto=format&fit=crop&q=80', weather: '68°F Clear', lastUpdated: '1s ago' },
+      { id: 'CAM-NWK-104', name: 'Ferry St & Raymond Blvd - East', agency: 'Newark Public Safety', location: 'Ferry St & Raymond Blvd (Ironbound)', address: '125 Ferry St, Newark, NJ', ward: 'Ward 1', lat: 40.7312, lng: -74.1610, health: 'ONLINE', fps: 30, aiStatus: 'ACTIVE_ALERT', aiDetection: 'Roadway Water Accumulation (Flooding)', confidence: 94, riskLevel: 'HIGH', streamUrl: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=800&auto=format&fit=crop&q=80', weather: '68°F Light Rain', lastUpdated: 'Just now' },
+      { id: 'CAM-NWK-108', name: 'McCarter Hwy & Raymond Blvd', agency: 'NJ Transit Operations', location: 'McCarter Hwy & Raymond Blvd', address: '200 McCarter Hwy, Newark, NJ', ward: 'Ward 1', lat: 40.7340, lng: -74.1650, health: 'ONLINE', fps: 30, aiStatus: 'NORMAL', aiDetection: 'Traffic Flow Nominal (32 mph avg)', confidence: 98, riskLevel: 'LOW', streamUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=800&auto=format&fit=crop&q=80', weather: '68°F Clear', lastUpdated: '2s ago' },
+      { id: 'CAM-NWK-112', name: 'Prudential Center Plaza West', agency: 'Newark Municipal Security', location: 'Lafayette St & Mulberry St', address: '25 Lafayette St, Newark, NJ', ward: 'Central Ward', lat: 40.7335, lng: -74.1710, health: 'ONLINE', fps: 30, aiStatus: 'ACTIVE_ALERT', aiDetection: 'Unscheduled Event Gathering (150+ People)', confidence: 88, riskLevel: 'MEDIUM', streamUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80', weather: '68°F Clear', lastUpdated: 'Just now' },
+      { id: 'CAM-NWK-115', name: 'Washington St & Central Ave', agency: 'Newark Code Enforcement', location: '129 Washington St', address: '129 Washington St, Newark, NJ', ward: 'Central Ward', lat: 40.7410, lng: -74.1750, health: 'ONLINE', fps: 30, aiStatus: 'CRITICAL_ALERT', aiDetection: 'Vacant Building Facade Masonry Decay', confidence: 96, riskLevel: 'CRITICAL', streamUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80', weather: '68°F Clear', lastUpdated: 'Just now' },
+      { id: 'CAM-BIZ-042', name: 'Ironbound Bank Plaza (Opt-In Partner)', agency: 'Opt-In Business Partner (ID: BIZ-902)', location: 'Ferry St Plaza Entrance', address: '85 Ferry St, Newark, NJ', ward: 'Ward 1', lat: 40.7318, lng: -74.1625, health: 'ONLINE', fps: 30, aiStatus: 'ACTIVE_ALERT', aiDetection: 'Illegal Dumping / Refuse Accumulation', confidence: 94, riskLevel: 'LOW', streamUrl: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=800&auto=format&fit=crop&q=80', weather: '68°F Clear', lastUpdated: '3s ago' }
+    ]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 43. POST /api/sentinel/cameras/opt-in: Register Business Opt-In Camera Stream
+app.post('/api/sentinel/cameras/opt-in', async (req, res) => {
+  const { businessName, address, streamType, rtspUrl, authorizationConsent } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.body.organizationId) as string;
 
   try {
     if (!orgId) orgId = await getNewarkOrgId();
-    await recordAudit(orgId, null, 'analyst@munevo.gov', `SENTINEL_SIGNAL_${status}`, 'SentinelSignal', id);
-    res.json({ status, signalId: id, action: action || 'VERIFIED_BY_ANALYST', timestamp: new Date().toISOString() });
+    const newCamId = `CAM-BIZ-${Math.floor(100 + Math.random() * 900)}`;
+    await recordAudit(orgId, null, 'business-partner@munevo.gov', 'OPT_IN_CAMERA_REGISTERED', 'SentinelCamera', newCamId);
+    res.status(201).json({
+      status: 'registered',
+      cameraId: newCamId,
+      businessName,
+      address,
+      authorizationConsent: true,
+      health: 'CONNECTED_ONLINE',
+      aiStatus: 'INITIALIZED'
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
