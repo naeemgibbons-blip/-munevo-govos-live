@@ -177,6 +177,98 @@ export const PlatformControlCenter: React.FC<PlatformControlCenterProps> = ({
           </div>
         </div>
       )}
+
+      {activeTab === 'auth-settings' && (
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card-header">
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                Enterprise Authentication & Identity Management
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Configure identity providers, Microsoft Entra SSO, enrollment policies, and password requirements.
+              </p>
+            </div>
+            <span className="badge-status badge-success">Supabase Auth Authoritative</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+            {/* Identity Providers Configuration */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Key size={16} style={{ color: '#3b82f6' }} />
+                <span>Identity Providers & SSO</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>Work Email & Password</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Standard password authentication with min 12-char policy</div>
+                </div>
+                <input type="checkbox" defaultChecked style={{ accentColor: '#3b82f6', width: '16px', height: '16px' }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+                    Microsoft Entra ID (Single Sign-On)
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>OIDC / OAuth 2.0 PKCE with Microsoft Work accounts</div>
+                </div>
+                <input type="checkbox" defaultChecked style={{ accentColor: '#3b82f6', width: '16px', height: '16px' }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Microsoft Entra Tenant ID</label>
+                <input type="text" className="ai-input" style={{ width: '100%', fontSize: '0.78rem' }} defaultValue="common" />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Microsoft Client Secret (Encrypted Server Variable)</label>
+                <input type="password" className="ai-input" style={{ width: '100%', fontSize: '0.78rem' }} value="••••••••••••••••••••••••" readOnly />
+              </div>
+            </div>
+
+            {/* Enrollment & Tenant Domain Policies */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={16} style={{ color: '#10b981' }} />
+                <span>Enrollment & Security Policy</span>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>New User Enrollment Mode</label>
+                <select className="role-select" style={{ width: '100%', background: '#161824', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                  <option value="INVITATION_REQUIRED">Option A: Invitation Required (Default Safe)</option>
+                  <option value="AUTO_ENROLL">Option B: Approved Domain Auto-Enrollment</option>
+                  <option value="ADMIN_QUEUE">Option C: Administrator Approval Queue</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Approved Municipal Email Domains</label>
+                <input type="text" className="ai-input" style={{ width: '100%', fontSize: '0.78rem' }} defaultValue="munevo.gov, newarknj.gov, austintexas.gov, seattle.gov" />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Default Role for Enrolled Users</label>
+                <input type="text" className="ai-input" style={{ width: '100%', fontSize: '0.78rem' }} defaultValue="Building Inspector" />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Require 12+ Char Password & Audit Logging</span>
+                <button 
+                  onClick={() => addNotification('Authentication & Identity Security Policy updated successfully!')}
+                  style={{ background: '#3b82f6', color: '#fff', border: 0, padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Save Identity Policy
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

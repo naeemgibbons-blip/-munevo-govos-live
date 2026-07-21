@@ -1598,6 +1598,60 @@ app.get('/api/case-comments/:type/:id', async (req, res) => {
   }
 });
 
+// 29. GET /api/auth-config: Retrieve tenant authentication & identity settings
+app.get('/api/auth-config', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    res.json({
+      organizationId: orgId,
+      emailPasswordEnabled: true,
+      microsoftEnabled: true,
+      microsoftTenantId: process.env.MICROSOFT_TENANT_ID || 'common',
+      microsoftClientId: process.env.MICROSOFT_CLIENT_ID || '00000000-0000-0000-0000-000000000000',
+      microsoftRedirectUri: `${req.protocol}://${req.get('host')}/auth/v1/callback`,
+      microsoftLogoutUri: `${req.protocol}://${req.get('host')}/auth/v1/logout`,
+      approvedDomains: ['munevo.gov', 'newarknj.gov', 'austintexas.gov', 'seattle.gov'],
+      enrollmentPolicy: 'INVITATION_REQUIRED',
+      defaultRole: 'Building Inspector',
+      sessionDurationHours: 12,
+      passwordPolicy: {
+        minLength: 12,
+        requireNumbers: true,
+        requireSymbols: true,
+        preventReuse: true
+      },
+      mfaRequired: false
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 30. POST /api/audit-logs/auth: Record authentication security audit events
+app.post('/api/audit-logs/auth', async (req, res) => {
+  const { eventType, userEmail, provider, result, metadata } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  const userId = req.headers['x-user-id'] as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    await recordAudit(
+      orgId, 
+      userId || null, 
+      userEmail || 'anonymous@munevo.gov', 
+      `AUTH_${eventType}`, 
+      'IdentitySession', 
+      provider || 'SupabaseAuth', 
+      null, 
+      { result, provider, metadata, timestamp: new Date().toISOString() }
+    );
+    res.status(201).json({ status: 'logged', eventType });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 29. POST /api/case-comments: File in-context case comment
 app.post('/api/case-comments', async (req, res) => {
   const { authorId, authorName, authorEmail, authorOfficeId, recordType, recordId, message } = req.body;
