@@ -33,6 +33,7 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
   const [demoLoading, setDemoLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'modules'>('home');
   const [activeModuleDetail, setActiveModuleDetail] = useState<string>('311');
+  const [activeHeroGraphic, setActiveHeroGraphic] = useState('/assets/prototypes/munevo_command_center_desktop.png');
 
   // Bootstrap setup checks
   const [hasGlobalAdmin, setHasGlobalAdmin] = useState(true);
@@ -340,14 +341,60 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
               </button>
             </div>
 
-            {/* Interactive Hero Screenshot */}
-            <div style={{ marginTop: '50px', width: '100%', position: 'relative', borderRadius: '16px', border: '1px solid #2A2E37', overflow: 'hidden', boxShadow: '0 30px 60px rgba(0,0,0,0.8)' }}>
+            {/* Interactive High-Fidelity Prototype Visual Showcase */}
+            <div style={{ marginTop: '40px', width: '100%', position: 'relative', borderRadius: '20px', border: '1px solid #2A2E37', overflow: 'hidden', boxShadow: '0 30px 70px rgba(0,0,0,0.85)', background: '#121520' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: '#0b0d14', borderBottom: '1px solid #2A2E37', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} style={{ color: '#3b82f6' }} />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Canvas OS Live Prototype Visuals
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
+                  {[
+                    { id: 'command', label: 'Executive Command Center', img: '/assets/prototypes/munevo_command_center_desktop.png' },
+                    { id: 'property', label: 'Property 360 Workspace', img: '/assets/prototypes/munevo_property_360_workspace.png' },
+                    { id: 'gis', label: 'GIS Spatial Intelligence', img: '/assets/prototypes/munevo_gis_digital_twin.png' },
+                    { id: 'tablet', label: 'Mobile Field Inspector', img: '/assets/prototypes/munevo_field_inspector_tablet.png' }
+                  ].map((item, idx) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveHeroGraphic(item.img)}
+                      style={{
+                        border: 'none',
+                        background: activeHeroGraphic === item.img ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.05)',
+                        color: activeHeroGraphic === item.img ? '#fff' : '#9AA3B2',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <img 
-                src="/munevo_hero.jpg" 
-                alt="Munevo Dashboard UI Mockup" 
-                style={{ width: '100%', display: 'block', maxHeight: '580px', objectFit: 'cover' }}
+                src={activeHeroGraphic} 
+                alt="Munevo Canvas OS High-Fidelity Prototype Visual" 
+                style={{ width: '100%', display: 'block', maxHeight: '640px', objectFit: 'cover' }}
               />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #0E0F12 5%, transparent 40%)' }} />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px', background: 'linear-gradient(to top, #0E0F12 10%, transparent 100%)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em' }}>NEWARK GOV CLOUD PROTOTYPE</span>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Unified Multi-Tenant Government Operating System</div>
+                </div>
+                <button 
+                  onClick={handleLaunchSandbox}
+                  style={{ background: '#3b82f6', color: '#fff', border: 0, borderRadius: '8px', padding: '8px 16px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Interactive Demo Sandbox →
+                </button>
+              </div>
             </div>
           </section>
 
