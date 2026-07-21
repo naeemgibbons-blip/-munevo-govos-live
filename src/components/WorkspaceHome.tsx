@@ -43,8 +43,8 @@ export interface WorkspaceItem {
 export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   {
     id: 'core',
-    name: 'MUNEVO CORE',
-    tagline: 'GOVERNMENT OS',
+    name: 'Munevo Core',
+    tagline: 'Government OS',
     color: '#3b82f6',
     icon: Building2,
     desc: 'The foundational operating system that powers every government operation.',
@@ -53,8 +53,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'civic',
-    name: 'MUNEVO CIVIC',
-    tagline: 'CITIZEN EXPERIENCE',
+    name: 'Munevo Civic',
+    tagline: 'Citizen Experience',
     color: '#06b6d4',
     icon: Scale,
     desc: 'Deliver connected digital services that strengthen community engagement and trust.',
@@ -63,8 +63,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'safe',
-    name: 'MUNEVO SAFE',
-    tagline: 'PUBLIC SAFETY',
+    name: 'Munevo Safe',
+    tagline: 'Public Safety',
     color: '#ef4444',
     icon: ShieldAlert,
     desc: 'Empower first responders and agencies with real-time tools for safer communities.',
@@ -74,8 +74,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'sentinel',
-    name: 'MUNEVO SENTINEL AI',
-    tagline: 'SITUATIONAL AWARENESS',
+    name: 'Munevo Sentinel AI',
+    tagline: 'Situational Awareness',
     color: '#8b5cf6',
     icon: Brain,
     desc: 'AI-powered intelligence and early warning for a safer, more resilient community.',
@@ -85,8 +85,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'gis',
-    name: 'MUNEVO GIS',
-    tagline: 'MAPS & PLANNING',
+    name: 'Munevo GIS',
+    tagline: 'Maps & Planning',
     color: '#22c55e',
     icon: Map,
     desc: 'Maps, data, and spatial intelligence for planning today and building tomorrow.',
@@ -95,8 +95,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'operations',
-    name: 'MUNEVO OPERATIONS',
-    tagline: 'CITY OPERATIONS',
+    name: 'Munevo Operations',
+    tagline: 'City Operations',
     color: '#f97316',
     icon: Wrench,
     desc: 'Streamline public works, assets, and operations to keep your city running efficiently.',
@@ -106,8 +106,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'finance',
-    name: 'MUNEVO FINANCE',
-    tagline: 'FINANCIAL MANAGEMENT',
+    name: 'Munevo Finance',
+    tagline: 'Financial Management',
     color: '#eab308',
     icon: DollarSign,
     desc: 'Modern financial tools for transparency, accountability, and strategic decisions.',
@@ -116,8 +116,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'hr',
-    name: 'MUNEVO HR',
-    tagline: 'WORKFORCE MANAGEMENT',
+    name: 'Munevo HR',
+    tagline: 'Workforce Management',
     color: '#14b8a6',
     icon: Users,
     desc: 'Empower your workforce and manage talent with confidence and clarity.',
@@ -126,8 +126,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'council',
-    name: 'MUNEVO COUNCIL',
-    tagline: 'LEGISLATIVE MANAGEMENT',
+    name: 'Munevo Council',
+    tagline: 'Legislative Management',
     color: '#94a3b8',
     icon: Landmark,
     desc: 'Manage meetings, agendas, legislation, and governance with ease and transparency.',
@@ -137,8 +137,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'insight',
-    name: 'MUNEVO INSIGHT',
-    tagline: 'ANALYTICS',
+    name: 'Munevo Insight',
+    tagline: 'Analytics & Intelligence',
     color: '#6366f1',
     icon: BarChart3,
     desc: 'Transform data into actionable insights for smarter government decisions.',
@@ -147,8 +147,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'marketplace',
-    name: 'MARKETPLACE',
-    tagline: 'EXTENSIONS & APPS',
+    name: 'Marketplace',
+    tagline: 'Extensions & Apps',
     color: '#ec4899',
     icon: ShoppingBag,
     desc: 'Discover pre-built government workflows, integrations, and third-party tools.',
@@ -157,8 +157,8 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
   },
   {
     id: 'control',
-    name: 'PLATFORM CONTROL',
-    tagline: 'SYSTEM ADMINISTRATION',
+    name: 'Platform Control Center',
+    tagline: 'System Administration',
     color: '#64748b',
     icon: Sliders,
     desc: 'Configure multi-tenant settings, identity sync, security compliance, and system roles.',
@@ -413,21 +413,18 @@ export const WorkspaceHome: React.FC<WorkspaceHomeProps> = ({
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Logo size={24} />
-                        <div style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: `${w.color}20`,
-                          border: `1px solid ${w.color}40`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: w.color
-                        }}>
-                          <IconComp size={15} />
-                        </div>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '10px',
+                        background: `${w.color}20`,
+                        border: `1px solid ${w.color}40`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: w.color
+                      }}>
+                        <IconComp size={18} />
                       </div>
                       <button 
                         onClick={(e) => togglePin(w.id, e)}
@@ -505,24 +502,21 @@ export const WorkspaceHome: React.FC<WorkspaceHomeProps> = ({
                     e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
                   }}
                 >
-                  {/* Top Brand Header */}
+                  {/* Card Icon & Controls Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Logo size={28} />
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: `${w.color}18`,
-                        border: `1px solid ${w.color}40`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: w.color,
-                        boxShadow: `0 0 10px ${w.color}20`
-                      }}>
-                        <IconComp size={18} />
-                      </div>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: `${w.color}20`,
+                      border: `1px solid ${w.color}50`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: w.color,
+                      boxShadow: `0 0 12px ${w.color}30`
+                    }}>
+                      <IconComp size={20} />
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

@@ -189,6 +189,18 @@ function App() {
     };
   }, [viewMode]);
 
+  // Global Ctrl+K / Cmd+K Command Palette listener
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
   const currentOrg = organizations.find(o => o.slug === tenant);
   const currentOrgId = currentOrg?.id || '';
 
@@ -669,10 +681,17 @@ function App() {
             </div>
           </header>
         ) : (
-          <header className="dashboard-header" style={{ display: 'flex', flexDirection: 'column', padding: '10px 24px 0 24px', background: '#11131c', borderBottom: '1px solid var(--border-color)', gap: '10px' }}>
+          <header className="dashboard-header">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              {/* Left Header: Universal Search Input */}
+              {/* Left Header: Brand Logo & Universal Search Input */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, maxWidth: '680px' }}>
+                <div 
+                  onClick={() => setViewMode('workspace-home')}
+                  title="Munevo Government Cloud - Return to Workspace Launcher"
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '12px', borderRight: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  <Logo size={26} />
+                </div>
                 <div 
                   className="header-search" 
                   onClick={() => setIsCommandPaletteOpen(true)}

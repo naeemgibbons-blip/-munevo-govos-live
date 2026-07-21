@@ -49,6 +49,12 @@
   --primary-color: hsl(var(--tenant-hue), var(--tenant-sat), var(--tenant-light));
   --primary-glow: hsla(var(--tenant-hue), var(--tenant-sat), var(--tenant-light), 0.3);
   --accent-color: hsl(var(--accent-hue), var(--accent-sat), var(--accent-light));
+
+  /* Authoritative Platform Shell Heights */
+  --global-header-height: 64px;
+  --record-tabs-height: 44px;
+  --total-shell-offset: 108px;
+  --floating-dock-height: 80px;
 }
 
 [data-theme="austin"] {
@@ -318,15 +324,18 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Header Utilities */
 .dashboard-header {
-  height: 70px;
+  min-height: var(--global-header-height);
+  position: sticky;
+  top: 0;
+  z-index: 100;
   border-bottom: 1px solid var(--border-color);
-  background: rgba(var(--bg-app-hsl), 0.4);
-  backdrop-filter: blur(12px);
+  background: #11131c;
+  backdrop-filter: blur(16px);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  z-index: 9;
+  flex-direction: column;
+  padding: 10px 24px 0 24px;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .header-search {
