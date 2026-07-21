@@ -2025,6 +2025,72 @@ app.post('/api/invites/:id/action', async (req, res) => {
   }
 });
 
+// 38. GET /api/safe/incidents: List Munevo Safe CAD Incidents
+app.get('/api/safe/incidents', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    res.json([
+      { id: 'INC-2026-9041', category: 'Fire & Rescue', priority: 'P1 - CRITICAL', location: '125 Broad St, Apt 4B (Ward 1)', reporter: 'Resident (Silent SOS)', status: 'DISPATCHED', assignedUnits: ['Engine 3', 'Ladder 1', 'Medic 12'], time: '2 mins ago', details: 'Heavy smoke reported on 4th floor residential hallway.' },
+      { id: 'INC-2026-9038', category: 'Police SOS', priority: 'P1 - HIGH', location: 'Ferry St & Raymond Blvd', reporter: '911 Transfer / Citizen App', status: 'EN ROUTE', assignedUnits: ['Unit 104', 'Unit 108'], time: '6 mins ago', details: '2-vehicle collision at intersection. Traffic blocked eastbound.' },
+      { id: 'INC-2026-9035', category: 'EMS Medical', priority: 'P2 - MEDIUM', location: 'Prudential Center Plaza', reporter: 'Anonymous Tip #TIP-8819', status: 'NEW', assignedUnits: [], time: '14 mins ago', details: 'Elderly citizen experiencing shortness of breath near north entrance.' }
+    ]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 39. POST /api/safe/incidents: Submit Citizen Safety Emergency Report
+app.post('/api/safe/incidents', async (req, res) => {
+  const { category, location, notes, isSilent, isAnonymous } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.body.organizationId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const newIncId = `INC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    await recordAudit(orgId, null, isAnonymous ? 'anonymous@munevo.gov' : 'citizen@munevo.gov', 'SAFE_INCIDENT_REPORTED', 'SafeIncident', newIncId);
+    res.status(201).json({
+      status: 'created',
+      incidentId: newIncId,
+      category,
+      location: location || '125 Broad St, Newark, NJ',
+      reportStatus: 'Report Received',
+      assignedUnits: ['Engine 3', 'Medic 12']
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 40. GET /api/sentinel/signals: List Sentinel Public-Source Signals
+app.get('/api/sentinel/signals', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    res.json([
+      { id: 'SIG-2026-881', source: 'Public Weather & Traffic Camera Feed #NWK-CAM-42', account: 'Public DOT Feed', timestamp: '6 mins ago', text: 'Water accumulating rapidly at Ferry St & Raymond Blvd intersection.', hashtags: '#NewarkNJ #Ironbound #Flooding', category: 'Infrastructure', subcategory: 'Flooding & Water Main', location: 'Ferry St & Raymond Blvd (Ward 1)', aiObservation: 'Possible Roadway Flooding & Water Accumulation', confidence: 94, status: 'AWAITING_REVIEW', corroborationsCount: 4 },
+      { id: 'SIG-2026-879', source: 'Public Social Post', account: '@NewarkCommuter_NJ', timestamp: '14 mins ago', text: 'Huge pothole open right outside Broad St Station near north crosswalk.', hashtags: '#NewarkNJ #BroadStreet #RoadHazard', category: 'Traffic & Transportation', subcategory: 'Pothole & Road Damage', location: 'Broad St & Atlantic St (Downtown)', aiObservation: 'Pothole & Roadway Pavement Structural Defect', confidence: 89, status: 'AWAITING_REVIEW', corroborationsCount: 2 },
+      { id: 'SIG-2026-874', source: 'Public Video Listing', account: '@NewarkArchitect_Public', timestamp: '28 mins ago', text: 'Bricks falling from upper facade of vacant commercial building on Washington St.', hashtags: '#NewarkNJ #CodeEnforcement #BuildingSafety', category: 'Buildings & Property', subcategory: 'Unsafe Structure Facade', location: '129 Washington St (Central Ward)', aiObservation: 'Exterior Building Facade Structural Decay', confidence: 91, status: 'VERIFIED', corroborationsCount: 3 }
+    ]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 41. POST /api/sentinel/signals/:id/verify: Verify or Discard Sentinel Signal
+app.post('/api/sentinel/signals/:id/verify', async (req, res) => {
+  const { id } = req.params;
+  const { status, action } = req.body; // status: VERIFIED | DISCARDED | DUPLICATE
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    await recordAudit(orgId, null, 'analyst@munevo.gov', `SENTINEL_SIGNAL_${status}`, 'SentinelSignal', id);
+    res.json({ status, signalId: id, action: action || 'VERIFIED_BY_ANALYST', timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`🚀 Munevo DB API Server listening on http://localhost:${PORT}`);

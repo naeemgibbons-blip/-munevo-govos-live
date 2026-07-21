@@ -25,6 +25,8 @@ import { PlatformActivityFeed } from './components/PlatformActivityFeed';
 import { UniversalCreateModal } from './components/UniversalCreateModal';
 import { PlatformControlCenter } from './components/PlatformControlCenter';
 import { FloatingDock } from './components/FloatingDock';
+import { MunevoSafeConsole } from './components/MunevoSafeConsole';
+import { SentinelAiConsole } from './components/SentinelAiConsole';
 import { supabase, updateSupabaseConfig } from './supabaseClient';
 import { 
   USER_ROLES, 
@@ -1479,6 +1481,22 @@ function App() {
                   <PlatformControlCenter 
                     currentProfile={currentProfile}
                     addNotification={addNotification}
+                  />
+                )}
+
+                {(activeModule === 'munevo-safe' || activeProduct === 'safe') && (
+                  <MunevoSafeConsole 
+                    currentProfile={currentProfile}
+                    addNotification={addNotification}
+                    onOpenChart={handleOpenChart}
+                  />
+                )}
+
+                {(activeModule === 'munevo-sentinel' || activeProduct === 'sentinel') && (
+                  <SentinelAiConsole 
+                    currentProfile={currentProfile}
+                    addNotification={addNotification}
+                    onOpenChart={handleOpenChart}
                   />
                 )}
               </>

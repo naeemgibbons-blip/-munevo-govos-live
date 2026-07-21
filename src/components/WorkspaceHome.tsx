@@ -68,7 +68,7 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
     color: '#ef4444',
     icon: ShieldAlert,
     desc: 'Empower first responders and agencies with real-time tools for safer communities.',
-    defaultModule: 'permits',
+    defaultModule: 'munevo-safe',
     alertsCount: 3,
     category: 'Civic & Safety'
   },
@@ -79,7 +79,7 @@ export const WORKSPACE_CATALOG: WorkspaceItem[] = [
     color: '#8b5cf6',
     icon: Brain,
     desc: 'AI-powered intelligence and early warning for a safer, more resilient community.',
-    defaultModule: 'system-audit',
+    defaultModule: 'munevo-sentinel',
     alertsCount: 1,
     category: 'Intelligence'
   },
