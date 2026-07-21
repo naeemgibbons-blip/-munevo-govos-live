@@ -1677,6 +1677,62 @@ app.post('/api/case-comments', async (req, res) => {
   }
 });
 
+// 31. GET /api/badges: Retrieve assigned municipal employee smart badges
+app.get('/api/badges', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    res.json([
+      { id: 'bdg_01', badgeId: 'BDG-NWK-0092', employeeName: 'Mayor Naeem Gibbons', email: 'mayor@munevo.gov', role: 'Mayor / City Manager', department: 'Executive Office', status: 'ACTIVE', lastTappedAt: new Date(Date.now() - 120000).toISOString(), pinRequired: true },
+      { id: 'bdg_02', badgeId: 'BDG-NWK-0412', employeeName: 'Elena Rostova', email: 'inspector@munevo.gov', role: 'Building Inspector', department: 'Code Enforcement', status: 'ACTIVE', lastTappedAt: new Date(Date.now() - 1080000).toISOString(), pinRequired: false },
+      { id: 'bdg_03', badgeId: 'BDG-NWK-0881', employeeName: 'David Chen', email: 'dchen@newark.gov', role: 'Public Works Director', department: 'City Operations', status: 'ACTIVE', lastTappedAt: new Date(Date.now() - 3600000).toISOString(), pinRequired: true },
+      { id: 'bdg_04', badgeId: 'BDG-NWK-0994', employeeName: 'Officer Sarah Jenkins', email: 'sjenkins@newarkpd.gov', role: 'Police Chief', department: 'Public Safety', status: 'ACTIVE', lastTappedAt: new Date(Date.now() - 7200000).toISOString(), pinRequired: true }
+    ]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 32. POST /api/auth/badge-unlock: Reauthenticate & unlock workstation session via NFC / PIV Badge Tap
+app.post('/api/auth/badge-unlock', async (req, res) => {
+  const { badgeId } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    
+    const knownBadges: Record<string, any> = {
+      'BDG-NWK-0092': { email: 'mayor@munevo.gov', name: 'Mayor Naeem Gibbons', role: 'Mayor / City Manager' },
+      'BDG-NWK-0412': { email: 'inspector@munevo.gov', name: 'Elena Rostova', role: 'Building Inspector' },
+      'BDG-NWK-0881': { email: 'dchen@newark.gov', name: 'David Chen', role: 'Public Works Director' }
+    };
+
+    const targetBadgeId = (badgeId || 'BDG-NWK-0092').toUpperCase();
+    const matched = knownBadges[targetBadgeId] || { email: 'mayor@munevo.gov', name: 'Mayor Naeem Gibbons', role: 'Mayor / City Manager' };
+
+    await recordAudit(
+      orgId,
+      'simulated-badge-user',
+      matched.email,
+      'AUTH_BADGE_UNLOCK_SUCCESS',
+      'WorkstationSession',
+      targetBadgeId,
+      null,
+      { badgeId: targetBadgeId, timestamp: new Date().toISOString(), result: 'UNLOCKED' }
+    );
+
+    res.json({
+      status: 'UNLOCKED',
+      userEmail: matched.email,
+      employeeName: matched.name,
+      role: matched.role,
+      unlockedAt: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`🚀 Munevo DB API Server listening on http://localhost:${PORT}`);

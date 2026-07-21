@@ -33,7 +33,10 @@ export const PlatformControlCenter: React.FC<PlatformControlCenterProps> = ({
     { id: 'kg-inspector', label: 'Knowledge Graph', icon: Network },
     { id: 'workflow', label: 'Workflow Engine Studio', icon: Workflow },
     { id: 'api-gateway', label: 'API Gateway & Integration', icon: Key },
-    { id: 'security', label: 'Security & Audit Center', icon: ShieldCheck }
+    { id: 'security', label: 'Security & Audit Center', icon: ShieldCheck },
+    { id: 'auth-settings', label: 'Authentication & Identity', icon: Key },
+    { id: 'badge-management', label: 'Badge Credentials (NFC/PIV)', icon: ShieldCheck },
+    { id: 'session-policies', label: 'Session Lock & Inactivity Policies', icon: Clock }
   ];
 
   return (
@@ -265,6 +268,186 @@ export const PlatformControlCenter: React.FC<PlatformControlCenterProps> = ({
                   Save Identity Policy
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 8: Badge Credentials Management (NFC/PIV Smart Badges) */}
+      {activeTab === 'badge-management' && (
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card-header">
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                Municipal Employee Badge Credentials Roster
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Manage physical NFC / PIV smart card badges, workstation readers, and tap-to-unlock permissions.
+              </p>
+            </div>
+            <button 
+              onClick={() => addNotification('Opened Administrator Badge Assignment Wizard')}
+              style={{ background: '#3b82f6', color: '#fff', border: 0, padding: '8px 14px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              + Enroll New Smart Badge
+            </button>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '10px' }}>Employee</th>
+                  <th style={{ padding: '10px' }}>Badge UID</th>
+                  <th style={{ padding: '10px' }}>Role / Dept</th>
+                  <th style={{ padding: '10px' }}>Status</th>
+                  <th style={{ padding: '10px' }}>Last Tapped</th>
+                  <th style={{ padding: '10px' }}>PIN Policy</th>
+                  <th style={{ padding: '10px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { badgeId: 'BDG-NWK-0092', name: 'Mayor Naeem Gibbons', role: 'Mayor / City Manager', dept: 'Executive Office', status: 'ACTIVE', lastTapped: '2 mins ago', pin: 'PIN Required' },
+                  { badgeId: 'BDG-NWK-0412', name: 'Elena Rostova', role: 'Building Inspector', dept: 'Code Enforcement', status: 'ACTIVE', lastTapped: '18 mins ago', pin: 'Tap Only' },
+                  { badgeId: 'BDG-NWK-0881', name: 'David Chen', role: 'Public Works Lead', dept: 'City Operations', status: 'ACTIVE', lastTapped: '1 hour ago', pin: 'PIN Required' },
+                  { badgeId: 'BDG-NWK-0994', name: 'Officer Sarah Jenkins', role: 'Police Chief', dept: 'Public Safety', status: 'ACTIVE', lastTapped: '2 hours ago', pin: 'PIN Required' }
+                ].map((b, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '12px 10px', color: '#fff', fontWeight: 700 }}>{b.name}</td>
+                    <td style={{ padding: '12px 10px', fontFamily: 'monospace', color: '#3b82f6' }}>{b.badgeId}</td>
+                    <td style={{ padding: '12px 10px', color: 'var(--text-muted)' }}>{b.role} ({b.dept})</td>
+                    <td style={{ padding: '12px 10px' }}>
+                      <span className="badge-status badge-success">{b.status}</span>
+                    </td>
+                    <td style={{ padding: '12px 10px', color: 'var(--text-muted)' }}>{b.lastTapped}</td>
+                    <td style={{ padding: '12px 10px', color: '#fff' }}>{b.pin}</td>
+                    <td style={{ padding: '12px 10px', display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={() => addNotification(`Suspended badge ${b.badgeId}`)}
+                        style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer' }}
+                      >
+                        Suspend
+                      </button>
+                      <button 
+                        onClick={() => addNotification(`Initiated badge replacement workflow for ${b.name}`)}
+                        style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer' }}
+                      >
+                        Replace
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 9: Session Lock & Inactivity Policies */}
+      {activeTab === 'session-policies' && (
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card-header">
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                Hospital-Style Workstation Session Lock & Timeout Policies
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Configure automatic inactivity warnings, opaque lock screens, and full session termination limits per security tier.
+              </p>
+            </div>
+          </div>
+
+          {/* Preset Tiers */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+            {[
+              { title: 'Standard Office', warn: '13 min', lock: '15 min', signout: '30 min', desc: 'Low sensitivity municipal desks' },
+              { title: 'Sensitive Government', warn: '2 min', lock: '3 min', signout: '15 min', desc: 'Recommended default for staff', active: true },
+              { title: 'Shared Workstation', warn: '1 min', lock: '2 min', signout: '10 min', desc: 'Public counters & inspection hubs' },
+              { title: 'Emergency Operations', warn: '30 sec', lock: '1 min', signout: '5 min', desc: 'Dispatch & EOC high security' }
+            ].map((preset, idx) => (
+              <div 
+                key={idx}
+                style={{
+                  background: preset.active ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255,255,255,0.02)',
+                  border: preset.active ? '1px solid #3b82f6' : '1px solid var(--border-color)',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}
+              >
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: preset.active ? '#3b82f6' : '#fff' }}>{preset.title}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{preset.desc}</div>
+                <div style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 600, marginTop: '4px' }}>
+                  Warn: {preset.warn} • Lock: {preset.lock}
+                </div>
+                <button
+                  onClick={() => addNotification(`Applied session policy preset: ${preset.title}`)}
+                  style={{
+                    marginTop: '6px',
+                    background: preset.active ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    border: 0,
+                    borderRadius: '6px',
+                    padding: '6px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {preset.active ? 'Active Policy' : 'Apply Preset'}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginTop: '10px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>Inactivity Timeout Controls</div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Warning Notice Lead Time (Seconds)</label>
+                <input type="number" className="ai-input" style={{ width: '100%' }} defaultValue={60} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Inactivity Lock Time (Minutes)</label>
+                <input type="number" className="ai-input" style={{ width: '100%' }} defaultValue={3} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Full Session Sign-Out Limit (Minutes)</label>
+                <input type="number" className="ai-input" style={{ width: '100%' }} defaultValue={15} />
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>Reauthentication & Multi-Tab Sync</div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>Shared Workstation Mode</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Fast 2-min lock, clear temp cache, prohibit password auto-fill</div>
+                </div>
+                <input type="checkbox" defaultChecked style={{ accentColor: '#3b82f6', width: '16px', height: '16px' }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>Multi-Tab Broadcast Sync</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Locking or signing out in one tab locks all open browser tabs</div>
+                </div>
+                <input type="checkbox" defaultChecked style={{ accentColor: '#3b82f6', width: '16px', height: '16px' }} />
+              </div>
+
+              <button
+                onClick={() => addNotification('Workstation Session Lock Policy saved successfully!')}
+                style={{ background: '#10b981', color: '#fff', border: 0, padding: '8px 16px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', marginTop: '6px' }}
+              >
+                Save Session Lock Configuration
+              </button>
             </div>
           </div>
         </div>

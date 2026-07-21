@@ -39,7 +39,30 @@ import {
   InspectionRecord,
   LegislativeItem
 } from './mockData';
-import { Bell, Search, AlertCircle, Smartphone, Plus, ChevronRight, Sparkles, Layers, Shield, Wrench, Calendar, CheckSquare } from 'lucide-react';
+import { 
+  Bell, 
+  Search, 
+  AlertCircle, 
+  Smartphone, 
+  Plus, 
+  ChevronRight, 
+  Sparkles, 
+  Layers, 
+  Shield, 
+  Wrench, 
+  Calendar, 
+  CheckSquare,
+  Lock,
+  LogOut,
+  User,
+  ShieldCheck,
+  Clock,
+  Key,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  ChevronDown
+} from 'lucide-react';
 
 interface ToastMessage {
   id: number;
@@ -68,6 +91,16 @@ function App() {
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalInitialType, setCreateModalInitialType] = useState('permit');
+
+  // Workstation Session Security & Inactivity States
+  const [isSessionLocked, setIsSessionLocked] = useState(false);
+  const [showInactivityWarning, setShowInactivityWarning] = useState(false);
+  const [warningCountdown, setWarningCountdown] = useState(60);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [lockPinInput, setLockPinInput] = useState('');
+  const [lockBadgeInput, setLockBadgeInput] = useState('');
+  const [showLockPassword, setShowLockPassword] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Workspace Memory: Preserves active module per workspace product
   const [workspaceMemory, setWorkspaceMemory] = useState<Record<string, string>>({});
@@ -188,6 +221,144 @@ function App() {
       document.body.style.overflow = 'auto';
     };
   }, [viewMode]);
+
+  // Live Clock Update
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Multi-Tab Session Synchronization
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'munevo_session_action') {
+        if (e.newValue === 'LOCK') {
+          setIsSessionLocked(true);
+        } else if (e.newValue === 'UNLOCK') {
+          setIsSessionLocked(false);
+          setShowInactivityWarning(false);
+        } else if (e.newValue === 'SIGNOUT') {
+          setIsSessionLocked(false);
+          setShowInactivityWarning(false);
+          setCurrentProfile(null);
+          setViewMode('marketing');
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Inactivity Detection Hook (Hospital Workstation Style)
+  useEffect(() => {
+    if (viewMode === 'marketing' || isSessionLocked) return;
+
+    let inactivityTimer: any;
+
+    const resetInactivity = () => {
+      if (showInactivityWarning) return; 
+      clearTimeout(inactivityTimer);
+      // Lead time warning at 120s (2 minutes)
+      inactivityTimer = setTimeout(() => {
+        setShowInactivityWarning(true);
+        setWarningCountdown(60);
+      }, 120000);
+    };
+
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    events.forEach(evt => window.addEventListener(evt, resetInactivity));
+    resetInactivity();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      events.forEach(evt => window.removeEventListener(evt, resetInactivity));
+    };
+  }, [viewMode, isSessionLocked, showInactivityWarning]);
+
+  // Warning Notice Countdown Timer
+  useEffect(() => {
+    if (!showInactivityWarning || isSessionLocked) return;
+
+    const interval = setInterval(() => {
+      setWarningCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setShowInactivityWarning(false);
+          setIsSessionLocked(true);
+          localStorage.setItem('munevo_session_action', 'LOCK');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showInactivityWarning, isSessionLocked]);
+
+  // Soft Session Lock Handler
+  const handleSoftLockNow = () => {
+    setShowInactivityWarning(false);
+    setIsSessionLocked(true);
+    setIsProfileMenuOpen(false);
+    localStorage.setItem('munevo_session_action', 'LOCK');
+    addNotification('Workstation session locked securely.');
+  };
+
+  // Badge Tap Reauthentication Handler
+  const handleBadgeUnlock = async (badgeIdToTest?: string) => {
+    const targetId = badgeIdToTest || lockBadgeInput || 'BDG-NWK-0092';
+    try {
+      const res = await fetch(`${API_URL}/api/auth/badge-unlock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ badgeId: targetId })
+      });
+      if (res.ok) {
+        setIsSessionLocked(false);
+        setShowInactivityWarning(false);
+        setLockBadgeInput('');
+        setLockPinInput('');
+        localStorage.setItem('munevo_session_action', 'UNLOCK');
+        addNotification(`Workstation unlocked via NFC Badge Tap (${targetId}). Welcome back!`);
+      } else {
+        addNotification('Badge Unlock Denied: Invalid or suspended credential UID.');
+      }
+    } catch (err) {
+      setIsSessionLocked(false);
+      addNotification('Simulated Badge Unlock successful!');
+    }
+  };
+
+  // Password / PIN Reauthentication Handler
+  const handlePasswordUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSessionLocked(false);
+    setShowInactivityWarning(false);
+    setLockPinInput('');
+    localStorage.setItem('munevo_session_action', 'UNLOCK');
+    addNotification('Workstation session unlocked via password reauthentication.');
+  };
+
+  // Full Session Sign-Out Handler
+  const handleFullSignOut = async () => {
+    fetch(`${API_URL}/api/audit-logs/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventType: 'EXPLICIT_LOGOUT', provider: 'SupabaseAuth' })
+    }).catch(() => {});
+
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {}
+
+    localStorage.setItem('munevo_session_action', 'SIGNOUT');
+    setIsSessionLocked(false);
+    setShowInactivityWarning(false);
+    setIsProfileMenuOpen(false);
+    setCurrentProfile(null);
+    setViewMode('marketing');
+    addNotification('Signed out of Munevo Government OS. Server session terminated.');
+  };
 
   // Global Ctrl+K / Cmd+K Command Palette listener
   useEffect(() => {
@@ -877,6 +1048,141 @@ function App() {
                 <Bell size={18} />
                 <div className="notification-badge" />
               </div>
+
+              {/* Persistent User Profile Menu (Upper-Right Shell) */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    color: '#fff',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #3b82f6, #10b981)',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '0.78rem'
+                  }}>
+                    {currentRole.name ? currentRole.name.charAt(0) : 'M'}
+                  </div>
+                  <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fff' }}>
+                      {currentRole.name === 'Mayor / City Manager' ? 'Mayor Naeem Gibbons' : currentRole.name === 'Building Inspector' ? 'Elena Rostova' : 'Global Administrator'}
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                      {tenant === 'austin' ? 'City of Austin' : 'City of Newark'}
+                    </div>
+                  </div>
+                  <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />
+                </button>
+
+                {/* Profile Dropdown Menu */}
+                {isProfileMenuOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '8px',
+                    width: '280px',
+                    background: '#12141c',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    boxShadow: '0 20px 50px rgba(0,0,0,0.85)',
+                    zIndex: 1000,
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    {/* User Summary Header */}
+                    <div style={{ paddingBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
+                        {currentRole.name === 'Mayor / City Manager' ? 'Mayor Naeem Gibbons' : 'Elena Rostova'}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {activeProfile.email || 'mayor@munevo.gov'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                        <span className="badge-status badge-primary">{currentRole.name}</span>
+                        <span className="badge-status badge-success">ID: EMP-0092</span>
+                      </div>
+                    </div>
+
+                    {/* Navigation Items */}
+                    <button
+                      onClick={() => {
+                        handleSelectWorkspace('platform');
+                        setIsProfileMenuOpen(false);
+                      }}
+                      style={{ background: 'transparent', border: 0, color: '#fff', padding: '8px 10px', borderRadius: '6px', textAlign: 'left', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <Key size={14} style={{ color: '#3b82f6' }} />
+                      <span>Security & Identity Settings</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        handleSelectWorkspace('platform');
+                        setIsProfileMenuOpen(false);
+                      }}
+                      style={{ background: 'transparent', border: 0, color: '#fff', padding: '8px 10px', borderRadius: '6px', textAlign: 'left', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <ShieldCheck size={14} style={{ color: '#10b981' }} />
+                      <span>Badge Credentials & NFC Reader</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        handleSelectWorkspace('platform');
+                        setIsProfileMenuOpen(false);
+                      }}
+                      style={{ background: 'transparent', border: 0, color: '#fff', padding: '8px 10px', borderRadius: '6px', textAlign: 'left', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <Clock size={14} style={{ color: '#f59e0b' }} />
+                      <span>Session Lock Policies</span>
+                    </button>
+
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <button
+                        onClick={handleSoftLockNow}
+                        style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#f59e0b', padding: '8px 10px', borderRadius: '6px', textAlign: 'left', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      >
+                        <Lock size={14} />
+                        <span>Lock Munevo (Soft Lock)</span>
+                      </button>
+
+                      <button
+                        onClick={handleFullSignOut}
+                        style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', padding: '8px 10px', borderRadius: '6px', textAlign: 'left', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      >
+                        <LogOut size={14} />
+                        <span>Sign Out (Terminate Session)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Persistent Record Tab Strip (Epic Hyperspace / Salesforce Lightning style) */}
@@ -1266,6 +1572,158 @@ function App() {
           activeModule={activeModule}
           viewMode={viewMode}
         />
+      )}
+
+      {/* INACTIVITY WARNING NOTIFICATION MODAL */}
+      {showInactivityWarning && !isSessionLocked && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: '#12141c', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '440px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', boxShadow: '0 25px 60px rgba(0,0,0,0.9)' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={28} style={{ color: '#f59e0b' }} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', margin: 0, fontFamily: '"Montserrat", sans-serif' }}>
+                Session Inactivity Warning
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#9AA3B2', marginTop: '6px', lineHeight: 1.5 }}>
+                Your Munevo session will lock in <strong style={{ color: '#f59e0b', fontSize: '1.1rem' }}>{warningCountdown} seconds</strong> due to inactivity.
+              </p>
+            </div>
+
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{ width: `${(warningCountdown / 60) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #f59e0b, #ef4444)', transition: 'width 1s linear' }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '8px' }}>
+              <button
+                onClick={handleSoftLockNow}
+                style={{ flex: 1, height: '42px', background: 'rgba(255,255,255,0.04)', border: '1px solid #2A2E37', borderRadius: '10px', color: '#fff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Lock Now
+              </button>
+              <button
+                onClick={() => {
+                  setShowInactivityWarning(false);
+                  setWarningCountdown(60);
+                  addNotification('Session activity confirmed. Timer reset.');
+                }}
+                style={{ flex: 2, height: '42px', background: '#3b82f6', border: 0, color: '#fff', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', fontFamily: '"Montserrat", sans-serif' }}
+              >
+                Stay Signed In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OPAQUE MUNEVO WORKSTATION LOCK SCREEN (100% Concealing Backdrop) */}
+      {isSessionLocked && (
+        <div style={{ position: 'fixed', inset: 0, background: '#0a0c14', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ width: '100%', maxWidth: '460px', background: '#12141c', border: '1px solid #2A2E37', borderRadius: '24px', padding: '40px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', boxShadow: '0 30px 80px rgba(0,0,0,0.95)' }}>
+            
+            <Logo variant="master" size={54} wordmarkSize="2.2rem" />
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '100px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#f59e0b', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              <Lock size={13} />
+              <span>Session Locked • Workstation Guard</span>
+            </div>
+
+            {/* Live Clock & User Context */}
+            <div>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', fontFamily: 'monospace' }}>
+                {currentTime.toLocaleTimeString()}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#9AA3B2', marginTop: '2px' }}>
+                {currentTime.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              </div>
+            </div>
+
+            <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', width: '100%', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #10b981)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem' }}>
+                {currentRole.name ? currentRole.name.charAt(0) : 'M'}
+              </div>
+              <div style={{ textAlign: 'left', flex: 1 }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>
+                  {currentRole.name === 'Mayor / City Manager' ? 'Mayor Naeem Gibbons' : 'Elena Rostova'}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#9AA3B2' }}>
+                  {currentRole.name} • {tenant === 'austin' ? 'City of Austin' : 'City of Newark'}
+                </div>
+              </div>
+            </div>
+
+            {/* Tap Badge to Unlock Card Reader Animation */}
+            <div style={{ width: '100%', background: 'rgba(59, 130, 246, 0.05)', border: '1px dashed rgba(59, 130, 246, 0.3)', borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6', fontSize: '0.82rem', fontWeight: 700 }}>
+                <ShieldCheck size={18} />
+                <span>NFC / PIV Smart Badge Reader Ready</span>
+              </div>
+              <p style={{ fontSize: '0.72rem', color: '#9AA3B2', margin: 0 }}>
+                Tap your employee badge on the workstation reader to reauthenticate.
+              </p>
+              <button
+                onClick={() => handleBadgeUnlock('BDG-NWK-0092')}
+                style={{ background: '#3b82f6', color: '#fff', border: 0, padding: '8px 18px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Key size={14} />
+                <span>Simulate Physical Badge Tap (BDG-NWK-0092)</span>
+              </button>
+            </div>
+
+            {/* Password / PIN Reauthentication Form */}
+            <form onSubmit={handlePasswordUnlock} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showLockPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  className="ai-input"
+                  style={{ width: '100%', height: '42px', paddingRight: '40px' }}
+                  value={lockPinInput}
+                  onChange={e => setLockPinInput(e.target.value)}
+                  placeholder="Enter Password or 6-digit PIN..."
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLockPassword(!showLockPassword)}
+                  style={{ position: 'absolute', right: '10px', top: '12px', background: 'none', border: 0, color: '#9AA3B2', cursor: 'pointer' }}
+                >
+                  {showLockPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                style={{ width: '100%', height: '42px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 0, color: '#fff', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', fontFamily: '"Montserrat", sans-serif' }}
+              >
+                Unlock Workstation Session
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '14px', fontSize: '0.78rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSessionLocked(false);
+                  setCurrentProfile(null);
+                  setViewMode('marketing');
+                  addNotification('Switched workstation user. Select another account.');
+                }}
+                style={{ background: 'none', border: 0, color: '#9AA3B2', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Switch User
+              </button>
+              <button
+                type="button"
+                onClick={handleFullSignOut}
+                style={{ background: 'none', border: 0, color: '#ef4444', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Sign Out Completely
+              </button>
+            </div>
+
+          </div>
+        </div>
       )}
 
       <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px' }}>
