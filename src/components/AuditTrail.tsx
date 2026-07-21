@@ -10,6 +10,7 @@ import {
   User,
   ShieldCheck
 } from 'lucide-react';
+import { ensureArray } from '../utils/arrayUtils';
 
 interface AuditLog {
   id: string;
@@ -54,7 +55,7 @@ export const AuditTrail: React.FC<AuditTrailProps> = ({
       });
       if (res.ok) {
         const data = await res.json();
-        setLogs(data);
+        setLogs(ensureArray(data));
       }
     } catch (err) {
       console.error('Failed to load system audit trail:', err);

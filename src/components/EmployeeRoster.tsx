@@ -11,8 +11,11 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
+  ShieldCheck,
   X
 } from 'lucide-react';
+import { ensureArray } from '../utils/arrayUtils';
 
 interface Certification {
   id: string;
@@ -88,7 +91,7 @@ export const EmployeeRoster: React.FC<EmployeeRosterProps> = ({
       });
       if (res.ok) {
         const data = await res.json();
-        setEmployees(data);
+        setEmployees(ensureArray(data));
       }
     } catch (err) {
       console.error('Failed to load employee directory:', err);

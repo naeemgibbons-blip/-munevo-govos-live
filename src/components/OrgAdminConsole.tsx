@@ -14,6 +14,7 @@ import {
   Loader2,
   Building
 } from 'lucide-react';
+import { ensureArray } from '../utils/arrayUtils';
 
 interface Organization {
   id: string;
@@ -111,10 +112,10 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
       const invitesData = await resInvites.json();
       const claimsData = await resClaims.json();
 
-      setCustomRoles(rolesData);
-      setProfiles(profilesData);
-      setInvites(invitesData);
-      setClaims(claimsData);
+      setCustomRoles(ensureArray(rolesData));
+      setProfiles(ensureArray(profilesData));
+      setInvites(ensureArray(invitesData));
+      setClaims(ensureArray(claimsData));
     } catch (err) {
       console.error('Failed to load org admin board:', err);
       addNotification('API Error: Offline context.');
@@ -373,7 +374,7 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
                 required
               >
                 <option value="">-- Choose Role --</option>
-                {customRoles.map(role => (
+                {ensureArray(customRoles).map(role => (
                   <option key={role.id} value={role.id}>{role.name}</option>
                 ))}
               </select>
@@ -397,17 +398,17 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
         <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <Shield className="text-emerald-500" size={18} />
-            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Custom Roles ({customRoles.length})</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Custom Roles ({ensureArray(customRoles).length})</h3>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto' }}>
-            {customRoles.length === 0 ? (
+            {ensureArray(customRoles).length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No custom roles registered.</div>
             ) : (
-              customRoles.map(role => (
+              ensureArray(customRoles).map(role => (
                 <div key={role.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>{role.name}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {role.permissions.filter(p => p.canView).map(p => (
+                    {ensureArray(role.permissions).filter(p => p.canView).map(p => (
                       <span key={p.module} style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {p.module.replace('-', ' ')}: {p.canEdit ? 'Edit' : 'View'}
                       </span>
@@ -423,10 +424,10 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
         <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <Users className="text-emerald-500" size={18} />
-            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Municipal Staff ({profiles.length})</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Municipal Staff ({ensureArray(profiles).length})</h3>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto' }}>
-            {profiles.map(prof => (
+            {ensureArray(profiles).map(prof => (
               <div key={prof.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px' }}>
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>{prof.email}</div>
@@ -446,13 +447,13 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
         <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <Clock className="text-emerald-500" size={18} />
-            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Pending Invites ({invites.length})</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Pending Invites ({ensureArray(invites).length})</h3>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto' }}>
-            {invites.length === 0 ? (
+            {ensureArray(invites).length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No pending invites.</div>
             ) : (
-              invites.map(inv => (
+              ensureArray(invites).map(inv => (
                 <div key={inv.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>{inv.email}</div>
@@ -477,13 +478,13 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
         <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <Building className="text-emerald-500" size={18} />
-            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Verification Claims Queue ({claims.length})</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Verification Claims Queue ({ensureArray(claims).length})</h3>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto' }}>
-            {claims.length === 0 ? (
+            {ensureArray(claims).length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No verification claims submitted.</div>
             ) : (
-              claims.map(claim => (
+              ensureArray(claims).map(claim => (
                 <div key={claim.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '12px', fontWeight: 600, color: '#fff' }}>{claim.targetAddress}</span>

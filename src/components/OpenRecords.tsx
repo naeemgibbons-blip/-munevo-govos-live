@@ -12,8 +12,10 @@ import {
   X, 
   ArrowRight,
   ShieldAlert,
-  Loader2
+  Loader2,
+  Building
 } from 'lucide-react';
+import { ensureArray } from '../utils/arrayUtils';
 
 interface OpenRecordsRequest {
   id: string;
@@ -65,7 +67,7 @@ export const OpenRecords: React.FC<OpenRecordsProps> = ({
       });
       if (res.ok) {
         const data = await res.json();
-        setRequests(data);
+        setRequests(ensureArray(data));
       }
     } catch (err) {
       console.error('Failed to load FOIA requests:', err);
@@ -252,7 +254,7 @@ export const OpenRecords: React.FC<OpenRecordsProps> = ({
                   </div>
                 </div>
               ) : (
-                filteredRequests.map(req => {
+                ensureArray(filteredRequests).map(req => {
                   const isSelected = selectedRequestId === req.id;
                   return (
                     <div 

@@ -12,6 +12,7 @@ import {
   Lock,
   X
 } from 'lucide-react';
+import { ensureArray } from '../utils/arrayUtils';
 
 interface Organization {
   id: string;
@@ -98,10 +99,10 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
       const invitesData = await resInvites.json();
       const requestsData = resRequests ? await resRequests.json() : [];
 
-      setOrganizations(orgsData);
-      setProfiles(profilesData);
-      setInvites(invitesData);
-      setDemoRequests(requestsData);
+      setOrganizations(ensureArray(orgsData));
+      setProfiles(ensureArray(profilesData));
+      setInvites(ensureArray(invitesData));
+      setDemoRequests(ensureArray(requestsData));
     } catch (err) {
       console.error('Failed to load global admin console records:', err);
       addNotification('Offline: Failed to load directory data.');
@@ -415,13 +416,13 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
         <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <Clock className="text-amber-500" size={18} />
-            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Pending Invites ({invites.length})</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Pending Invites ({ensureArray(invites).length})</h3>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
-            {invites.length === 0 ? (
+            {ensureArray(invites).length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No pending invites sent.</div>
             ) : (
-              invites.map(inv => (
+              ensureArray(invites).map(inv => (
                 <div key={inv.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>{inv.email}</div>
@@ -449,7 +450,7 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
       </>
       ) : (
         <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 16px 0', color: '#fff' }}>Demo Requests Leads ({demoRequests.length})</h3>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 16px 0', color: '#fff' }}>Demo Requests Leads ({ensureArray(demoRequests).length})</h3>
           
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -463,14 +464,14 @@ export const GlobalAdminConsole: React.FC<GlobalAdminConsoleProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {demoRequests.length === 0 ? (
+                {ensureArray(demoRequests).length === 0 ? (
                   <tr>
                     <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
                       No demo requests received yet.
                     </td>
                   </tr>
                 ) : (
-                  demoRequests.map(req => (
+                  ensureArray(demoRequests).map(req => (
                     <tr key={req.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#fff' }}>
                       <td style={{ padding: '12px', color: 'var(--text-muted)' }}>
                         {new Date(req.createdAt).toLocaleDateString()}
