@@ -224,26 +224,28 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: inviteEmail,
-          isOrgAdmin: false,
           roleId: selectedRoleId,
           organizationId: orgId,
-          invitedById: currentProfile?.id || 'simulated-admin-id'
+          invitedByUserId: currentProfile?.id || 'simulated-admin-id'
         })
       });
 
-      if (res.ok) {
-        const newInvite = await res.json();
-        // Bind role locally for rendering
-        const targetRole = customRoles.find(r => r.id === selectedRoleId);
-        newInvite.role = targetRole || null;
+      const data = await res.json();
 
-        setInvites(prev => [newInvite, ...prev]);
-        setInviteEmail('');
-        addNotification(`Sent staff invite link to ${inviteEmail}!`);
+      if (data.status === 'created') {
+        addNotification(`Invitation sent successfully to ${inviteEmail}.`);
+      } else if (data.status === 'resent') {
+        addNotification(`An existing invitation for ${inviteEmail} was found and has been resent.`);
+      } else if (data.status === 'renewed') {
+        addNotification(`The expired invitation for ${inviteEmail} has been renewed and resent.`);
+      } else if (data.status === 'already_member') {
+        addNotification(`This user (${inviteEmail}) is already a member of this organization.`);
       } else {
-        const err = await res.json();
-        addNotification(`Error: ${err.error || 'Failed to create invite'}`);
+        addNotification(`Notice: ${data.message || 'Invitation processed.'}`);
       }
+
+      setInviteEmail('');
+      fetchTenantData();
     } catch (e) {
       addNotification('API error: Failed to dispatch invitation.');
     }

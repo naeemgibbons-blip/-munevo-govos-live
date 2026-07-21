@@ -9,15 +9,20 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
-// 1. Organization (Municipality)
+// 1. Organization (Tenant)
 model Organization {
   id                  String               @id @default(uuid())
   name                String               @unique // e.g., "City of Newark"
   slug                String               @unique // e.g., "newark"
+  organizationType    String               @default("MUNICIPALITY")
+  status              String               @default("ACTIVE")
   createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @default(now()) @updatedAt
   enabledModules      String               @default("all")
   
   // Relations
+  memberships         Membership[]
+  invitations         Invitation[]
   profiles            Profile[]
   customRoles         CustomRole[]
   properties          Property[]
@@ -26,7 +31,6 @@ model Organization {
   permits             Permit[]
   inspections         Inspection[]
   trackerItems        TrackerItem[]
-  invites             Invite[]
   openRecordsRequests OpenRecordsRequest[]
   employees           Employee[]
   auditLogs           AuditLog[]
@@ -47,7 +51,8 @@ model CustomRole {
   // Relations
   permissions    Permission[]
   profiles       Profile[]
-  invites        Invite[]
+  memberships    Membership[]
+  invitations    Invitation[]
 
   @@unique([organizationId, name]) // Names are unique within a single organization
 }
@@ -67,47 +72,86 @@ model Permission {
 
 // 4. User Profile (linked to Supabase auth.users.id)
 model Profile {
-  id             String        @id // Maps to Supabase auth.users.id
-  email          String        @unique
-  badgeId        String?       @unique // Optional alternate fast tap-card login credentials
+  id                 String               @id // Maps to Supabase auth.users.id
+  email              String               @unique
+  normalizedEmail    String               @default("")
+  firstName          String?
+  lastName           String?
+  displayName        String?
+  badgeId            String?              @unique
+  identityProvider   String               @default("SupabaseAuth")
+  externalIdentityId String?
+  status             String               @default("ACTIVE")
+  lastLoginAt        DateTime?
   
   // Platform Permissions
-  isGlobalAdmin  Boolean       @default(false)
-  isOrgAdmin     Boolean       @default(false)
+  isGlobalAdmin      Boolean              @default(false)
+  isOrgAdmin         Boolean              @default(false)
   
-  // Organization Context
-  organizationId String?       // Null for Global Admins
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  // Primary Organization Context
+  organizationId     String?              
+  organization       Organization?        @relation(fields: [organizationId], references: [id])
+  roleId             String?              
+  role               CustomRole?          @relation(fields: [roleId], references: [id])
+  districtOfficeId   String?
+  districtOffice     MunicipalOffice?     @relation(fields: [districtOfficeId], references: [id])
   
-  // Assigned Custom Role (required for Staff, null for Admins)
-  roleId         String?       
-  role           CustomRole?   @relation(fields: [roleId], references: [id])
-  
-  // Branch/Office Association (Optional District for residents)
-  districtOfficeId String?
-  districtOffice   MunicipalOffice? @relation(fields: [districtOfficeId], references: [id])
-  
-  createdAt      DateTime      @default(now())
-  sentInvites    Invite[]      @relation("InvitedBy")
-  employee       Employee?
+  // Relations
+  memberships        Membership[]
+  sentInvitations    Invitation[]         @relation("InvitedBy")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @default(now()) @updatedAt
+  employee           Employee?
   verificationClaims VerificationClaim[]
 }
 
-// 5. Invitations Flow (Invite-Only)
-model Invite {
+// 4.5. Multi-Tenant Membership (Connects User to multiple Orgs)
+model Membership {
   id             String        @id @default(uuid())
-  email          String        @unique
-  isOrgAdmin     Boolean       @default(false) // True if inviting the primary Org Admin
-  roleId         String?       // Pre-assigned custom role for Staff
+  userId         String        
+  user           Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  roleId         String?
   role           CustomRole?   @relation(fields: [roleId], references: [id])
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  token          String        @unique @default(dbgenerated("gen_random_uuid()"))
-  status         String        @default("PENDING") // "PENDING" | "ACCEPTED" | "EXPIRED"
-  expiresAt      DateTime
-  invitedById    String
-  invitedBy      Profile       @relation("InvitedBy", fields: [invitedById], references: [id])
+  departmentId   String?       
+  divisionId     String?       
+  jobTitle       String?       
+  status         String        @default("ACTIVE") // "ACTIVE" | "SUSPENDED" | "INACTIVE"
+  isPrimary      Boolean       @default(false)
+  joinedAt       DateTime      @default(now())
   createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
+
+  @@unique([userId, organizationId]) // Composite unique constraint for multi-tenancy!
+}
+
+// 5. Enterprise Multi-Tenant Invitation Model
+model Invitation {
+  id                 String        @id @default(uuid())
+  organizationId     String
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email              String        
+  normalizedEmail    String        
+  roleId             String?
+  role               CustomRole?   @relation(fields: [roleId], references: [id])
+  departmentId       String?
+  divisionId         String?
+  jobTitle           String?
+  invitedByUserId    String
+  invitedByUser      Profile       @relation("InvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  tokenHash          String        @unique @default(dbgenerated("gen_random_uuid()"))
+  status             String        @default("PENDING") // "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED" | "CANCELLED"
+  sentAt             DateTime      @default(now())
+  expiresAt          DateTime
+  acceptedAt         DateTime?
+  revokedAt          DateTime?
+  cancelledAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @default(now()) @updatedAt
+
+  @@unique([organizationId, normalizedEmail]) // Composite constraint per Tenant & Email!
 }
 
 // Operational Tables

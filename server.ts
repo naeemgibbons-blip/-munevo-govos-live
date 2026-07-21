@@ -451,12 +451,14 @@ app.post('/api/onboarding', async (req, res) => {
       });
     }
 
-    const invite = await prisma.invite.create({
+    const normAdminEmail = (adminEmail || '').trim().toLowerCase();
+    const invite = await prisma.invitation.create({
       data: {
         email: adminEmail,
-        isOrgAdmin: true,
+        normalizedEmail: normAdminEmail,
         organizationId: org.id,
-        invitedById: invitedById || 'simulated-user-global_admin',
+        invitedByUserId: invitedById || 'simulated-user-global_admin',
+        tokenHash: `tok_${Math.random().toString(36).substring(2)}${Date.now()}`,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       }
     });
@@ -886,39 +888,19 @@ app.post('/api/auth/bootstrap', async (req, res) => {
   }
 });
 
-// 7. GET /api/invites: List invites
-app.get('/api/invites', async (req, res) => {
+// Legacy route alias (delegates to new enterprise invitation service)
+app.get('/api/v1/legacy-invites', async (req, res) => {
   const orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
   try {
-    const invites = await prisma.invite.findMany({
+    const invites = await prisma.invitation.findMany({
       where: orgId ? { organizationId: orgId } : {},
       include: {
         organization: true,
         role: true,
-        invitedBy: true
+        invitedByUser: true
       }
     });
     res.json(invites);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 8. POST /api/invites: Create pending user invitation
-app.post('/api/invites', async (req, res) => {
-  const { email, isOrgAdmin, roleId, organizationId, invitedById } = req.body;
-  try {
-    const invite = await prisma.invite.create({
-      data: {
-        email,
-        isOrgAdmin: !!isOrgAdmin,
-        roleId: roleId || null,
-        organizationId: organizationId || null,
-        invitedById,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days expiration
-      }
-    });
-    res.status(201).json(invite);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1728,6 +1710,316 @@ app.post('/api/auth/badge-unlock', async (req, res) => {
       role: matched.role,
       unlockedAt: new Date().toISOString()
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper: Email Normalization
+function normalizeEmail(email: string): string {
+  return (email || '').trim().toLowerCase();
+}
+
+// 33. POST /api/invites: Enterprise Invite Member endpoint
+app.post('/api/invites', async (req, res) => {
+  const { email, roleId, departmentId, divisionId, jobTitle, invitedByUserId } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.body.organizationId) as string;
+
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ status: 'error', message: 'Enter a valid work email address.' });
+  }
+
+  const normEmail = normalizeEmail(email);
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+
+    // 1. Check whether User exists & already has an active Membership in this Organization
+    const existingUser = await prisma.profile.findFirst({
+      where: { normalizedEmail: normEmail }
+    });
+
+    if (existingUser) {
+      const existingMembership = await prisma.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: existingUser.id,
+            organizationId: orgId
+          }
+        }
+      });
+
+      if (existingMembership && existingMembership.status === 'ACTIVE') {
+        await recordAudit(orgId, null, normEmail, 'ALREADY_MEMBER_PREVENTED', 'Membership', existingMembership.id);
+        return res.json({
+          status: 'already_member',
+          message: 'This user is already a member of this organization.',
+          user: existingUser,
+          membership: existingMembership
+        });
+      }
+    }
+
+    // 2. Check whether an Invitation already exists for this Organization and normalizedEmail
+    const existingInvite = await prisma.invitation.findUnique({
+      where: {
+        organizationId_normalizedEmail: {
+          organizationId: orgId,
+          normalizedEmail: normEmail
+        }
+      }
+    });
+
+    const tokenHash = `tok_${Math.random().toString(36).substring(2)}${Date.now()}`;
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days expiration
+
+    if (existingInvite) {
+      if (existingInvite.status === 'PENDING') {
+        // RESEND INVITATION
+        const updated = await prisma.invitation.update({
+          where: { id: existingInvite.id },
+          data: {
+            tokenHash,
+            sentAt: new Date(),
+            expiresAt,
+            roleId: roleId || existingInvite.roleId,
+            departmentId: departmentId || existingInvite.departmentId,
+            invitedByUserId: invitedByUserId || existingInvite.invitedByUserId
+          }
+        });
+
+        await recordAudit(orgId, null, normEmail, 'INVITE_RESENT', 'Invitation', updated.id);
+        return res.json({
+          status: 'resent',
+          message: 'An existing invitation was found and has been resent.',
+          invitation: updated
+        });
+      } else if (['EXPIRED', 'REVOKED', 'CANCELLED'].includes(existingInvite.status)) {
+        // RENEW INVITATION
+        const renewed = await prisma.invitation.update({
+          where: { id: existingInvite.id },
+          data: {
+            status: 'PENDING',
+            tokenHash,
+            sentAt: new Date(),
+            expiresAt,
+            revokedAt: null,
+            cancelledAt: null,
+            roleId: roleId || existingInvite.roleId,
+            departmentId: departmentId || existingInvite.departmentId
+          }
+        });
+
+        await recordAudit(orgId, null, normEmail, 'INVITE_RENEWED', 'Invitation', renewed.id);
+        return res.json({
+          status: 'renewed',
+          message: 'The expired invitation has been renewed and resent.',
+          invitation: renewed
+        });
+      }
+    }
+
+    // 3. CREATE NEW INVITATION
+    let inviterId = invitedByUserId;
+    if (!inviterId) {
+      const inviter = await prisma.profile.findFirst({ where: { email: { contains: 'mayor' } } });
+      inviterId = inviter ? inviter.id : 'system_admin';
+    }
+
+    const newInvite = await prisma.invitation.create({
+      data: {
+        organizationId: orgId,
+        email,
+        normalizedEmail: normEmail,
+        roleId: roleId || null,
+        departmentId: departmentId || null,
+        divisionId: divisionId || null,
+        jobTitle: jobTitle || null,
+        invitedByUserId: inviterId,
+        tokenHash,
+        status: 'PENDING',
+        expiresAt
+      }
+    });
+
+    await recordAudit(orgId, null, normEmail, 'INVITE_CREATED', 'Invitation', newInvite.id);
+    return res.status(201).json({
+      status: 'created',
+      message: 'Invitation sent successfully.',
+      invitation: newInvite
+    });
+
+  } catch (err: any) {
+    console.error('Invite Member Error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed processing tenant invitation request.', error: err.message });
+  }
+});
+
+// 34. GET /api/invites: Fetch invitations list for tenant administration
+app.get('/api/invites', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const invites = await prisma.invitation.findMany({
+      where: { organizationId: orgId },
+      include: { role: true, invitedByUser: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(invites);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 35. POST /api/invites/accept: Accept Invitation and create Membership
+app.post('/api/invites/accept', async (req, res) => {
+  const { token, userId, userEmail, firstName, lastName } = req.body;
+  if (!token) return res.status(400).json({ status: 'error', message: 'Invitation token is required.' });
+
+  try {
+    const invite = await prisma.invitation.findUnique({
+      where: { tokenHash: token }
+    });
+
+    if (!invite) {
+      return res.status(404).json({ status: 'error', message: 'Invalid or expired invitation token.' });
+    }
+
+    if (invite.status !== 'PENDING') {
+      return res.status(400).json({ status: 'error', message: `Invitation has already been ${invite.status.toLowerCase()}.` });
+    }
+
+    if (new Date() > invite.expiresAt) {
+      await prisma.invitation.update({ where: { id: invite.id }, data: { status: 'EXPIRED' } });
+      return res.status(400).json({ status: 'error', message: 'Invitation has expired.' });
+    }
+
+    const normEmail = normalizeEmail(userEmail || invite.email);
+
+    // Database transaction: Create/find Profile + Create Membership + Mark Invitation ACCEPTED
+    const result = await prisma.$transaction(async (tx) => {
+      let profile = await tx.profile.findFirst({ where: { normalizedEmail: normEmail } });
+      if (!profile) {
+        profile = await tx.profile.create({
+          data: {
+            id: userId || `usr_${Math.random().toString(36).substring(2)}`,
+            email: invite.email,
+            normalizedEmail: normEmail,
+            firstName: firstName || '',
+            lastName: lastName || '',
+            displayName: `${firstName || ''} ${lastName || ''}`.trim() || invite.email,
+            organizationId: invite.organizationId,
+            roleId: invite.roleId
+          }
+        });
+      }
+
+      const membership = await tx.membership.upsert({
+        where: {
+          userId_organizationId: {
+            userId: profile.id,
+            organizationId: invite.organizationId
+          }
+        },
+        create: {
+          userId: profile.id,
+          organizationId: invite.organizationId,
+          roleId: invite.roleId,
+          departmentId: invite.departmentId,
+          divisionId: invite.divisionId,
+          jobTitle: invite.jobTitle,
+          status: 'ACTIVE',
+          isPrimary: true
+        },
+        update: {
+          status: 'ACTIVE',
+          roleId: invite.roleId || undefined,
+          departmentId: invite.departmentId || undefined
+        }
+      });
+
+      await tx.invitation.update({
+        where: { id: invite.id },
+        data: {
+          status: 'ACCEPTED',
+          acceptedAt: new Date()
+        }
+      });
+
+      return { profile, membership };
+    });
+
+    await recordAudit(invite.organizationId, result.profile.id, normEmail, 'INVITATION_ACCEPTED', 'Membership', result.membership.id);
+
+    res.json({
+      status: 'accepted',
+      message: 'Invitation accepted successfully! Welcome to Munevo Government Cloud.',
+      result
+    });
+
+  } catch (err: any) {
+    console.error('Accept Invitation Error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed accepting invitation.', error: err.message });
+  }
+});
+
+// 36. GET /api/members: Fetch multi-tenant organization members roster
+app.get('/api/members', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const members = await prisma.membership.findMany({
+      where: { organizationId: orgId },
+      include: { user: true, role: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(members);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 37. POST /api/invites/:id/action: Resend, Revoke, or Cancel Invitation
+app.post('/api/invites/:id/action', async (req, res) => {
+  const { id } = req.params;
+  const { action } = req.body; // "RESEND" | "REVOKE" | "CANCEL"
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const invite = await prisma.invitation.findUnique({ where: { id } });
+    if (!invite) return res.status(404).json({ error: 'Invitation not found' });
+
+    if (action === 'RESEND') {
+      const newToken = `tok_${Math.random().toString(36).substring(2)}${Date.now()}`;
+      const updated = await prisma.invitation.update({
+        where: { id },
+        data: {
+          tokenHash: newToken,
+          sentAt: new Date(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          status: 'PENDING'
+        }
+      });
+      await recordAudit(orgId, null, invite.normalizedEmail, 'INVITE_RESENT', 'Invitation', id);
+      return res.json({ status: 'resent', message: 'Invitation resent successfully.', invitation: updated });
+    } else if (action === 'REVOKE') {
+      const updated = await prisma.invitation.update({
+        where: { id },
+        data: { status: 'REVOKED', revokedAt: new Date() }
+      });
+      await recordAudit(orgId, null, invite.normalizedEmail, 'INVITE_REVOKED', 'Invitation', id);
+      return res.json({ status: 'revoked', message: 'Invitation revoked.', invitation: updated });
+    } else if (action === 'CANCEL') {
+      const updated = await prisma.invitation.update({
+        where: { id },
+        data: { status: 'CANCELLED', cancelledAt: new Date() }
+      });
+      await recordAudit(orgId, null, invite.normalizedEmail, 'INVITE_CANCELLED', 'Invitation', id);
+      return res.json({ status: 'cancelled', message: 'Invitation cancelled.', invitation: updated });
+    }
+
+    res.status(400).json({ error: 'Invalid action' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
