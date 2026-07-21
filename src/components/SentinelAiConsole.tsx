@@ -79,129 +79,94 @@ export const SentinelAiConsole: React.FC<SentinelAiConsoleProps> = ({
   const [optInAddress, setOptInAddress] = useState('');
   const [optInConsent, setOptInConsent] = useState(true);
 
-  // Regional Auto-Discovered Cameras (NJ511, NJ Turnpike Authority, NYC DOT, Newark Security)
-  const [cameras, setCameras] = useState([
+  // Camera Feeds Catalog State (Fetched from /api/cameras)
+  const [cameras, setCameras] = useState<any[]>([
     {
-      id: 'CAM-NWK-101',
-      name: 'Broad St & Market St - North',
-      agency: 'NJ511 Regional Feed',
-      sourceUrl: 'https://511nj.org/camera',
-      location: 'Broad St & Market St (Downtown Newark)',
-      address: '920 Broad St, Newark, NJ',
-      ward: 'Central Ward',
-      health: 'ONLINE',
-      fps: 30,
-      aiStatus: 'ACTIVE_ALERT',
-      aiDetection: 'Pedestrian Congestion & Vehicle Backup',
-      confidence: 92,
-      riskLevel: 'MEDIUM',
-      incidentCount: 2,
-      streamUrl: 'https://images.unsplash.com/photo-1577083552431-6e5fd01aa342?w=800&auto=format&fit=crop&q=80',
-      weather: '68°F Clear',
-      lastUpdated: '1s ago',
-      udmPropertyId: 'prop_01'
+      id: 'NYCDOT-301002c0-fe39-4fad-998a-fdc66e531b1d',
+      sourceSystem: 'NYCDOT',
+      sourceAgency: 'NYC DOT / NYCTMC',
+      name: 'Lincoln Tunnel Approach (31st St @ 9th/10th Ave)',
+      roadway: 'Lincoln Tunnel Approach',
+      direction: 'Westbound',
+      municipality: 'Manhattan',
+      state: 'NY',
+      mediaType: 'REFRESHED_IMAGE',
+      imageUrl: 'https://webcams.nyctmc.org/api/cameras/301002c0-fe39-4fad-998a-fdc66e531b1d/image',
+      officialPageUrl: 'https://webcams.nyctmc.org/map',
+      refreshIntervalSeconds: 15,
+      status: 'AVAILABLE',
+      lastSuccessfulFetch: 'Just now',
+      attribution: { agency: 'NYC DOT', text: 'Traffic camera feed provided by NYC DOT / NYCTMC Webcams.', url: 'https://webcams.nyctmc.org/map' }
     },
     {
-      id: 'CAM-NJTA-14',
-      name: 'NJ Turnpike Exit 14 / I-78 Interchange',
-      agency: 'NJ Turnpike Authority (NJTA)',
-      sourceUrl: 'https://www.njta.gov/travel-resources/camera-list/',
-      location: 'Turnpike Exit 14 Newark Airport Connector',
-      address: 'I-78 & NJ Turnpike MP 106',
-      ward: 'South Ward',
-      health: 'ONLINE',
-      fps: 30,
-      aiStatus: 'ACTIVE_ALERT',
-      aiDetection: 'Stopped Freight Truck on Shoulder',
-      confidence: 94,
-      riskLevel: 'HIGH',
-      incidentCount: 1,
-      streamUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=800&auto=format&fit=crop&q=80',
-      weather: '68°F Clear',
-      lastUpdated: 'Just now',
-      udmPropertyId: 'prop_02'
+      id: 'NJ511-101',
+      sourceSystem: 'NJ511',
+      sourceAgency: 'NJ511 / NJDOT',
+      name: 'Broad St & Market St - Northbound Corridor',
+      roadway: 'Broad Street',
+      direction: 'Northbound',
+      municipality: 'Newark',
+      state: 'NJ',
+      mediaType: 'REFRESHED_IMAGE',
+      imageUrl: 'https://webcams.nyctmc.org/api/cameras/23bcc0dd-d395-45fe-8106-676ba7293208/image',
+      officialPageUrl: 'https://511nj.org/camera',
+      refreshIntervalSeconds: 15,
+      status: 'AVAILABLE',
+      lastSuccessfulFetch: '2s ago',
+      attribution: { agency: 'NJDOT', text: 'Camera feed provided by 511NJ Official Network.', url: 'https://511nj.org/camera' }
     },
     {
-      id: 'CAM-NWK-104',
-      name: 'Ferry St & Raymond Blvd - East',
-      agency: 'Newark Public Safety CAD',
-      sourceUrl: 'https://munevo.gov/cctv',
-      location: 'Ferry St & Raymond Blvd (Ironbound)',
-      address: '125 Ferry St, Newark, NJ',
-      ward: 'Ward 1',
-      health: 'ONLINE',
-      fps: 30,
-      aiStatus: 'ACTIVE_ALERT',
-      aiDetection: 'Roadway Water Accumulation (Flooding)',
-      confidence: 96,
-      riskLevel: 'HIGH',
-      incidentCount: 3,
-      streamUrl: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=800&auto=format&fit=crop&q=80',
-      weather: '68°F Light Rain',
-      lastUpdated: 'Just now',
-      udmPropertyId: 'prop_04'
-    },
-    {
-      id: 'CAM-NYCDOT-88',
-      name: 'Holland Tunnel Approach & Route 1/9',
-      agency: 'NYC DOT Regional Travel',
-      sourceUrl: 'https://webcams.nyctmc.org/map',
-      location: 'Pulaski Skyway / Rt 1/9 Entrance',
-      address: 'Route 1/9 North, Newark, NJ',
-      ward: 'East Ward',
-      health: 'ONLINE',
-      fps: 30,
-      aiStatus: 'NORMAL',
-      aiDetection: 'Traffic Flow Nominal (44 mph avg)',
-      confidence: 98,
-      riskLevel: 'LOW',
-      incidentCount: 0,
-      streamUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=800&auto=format&fit=crop&q=80',
-      weather: '68°F Clear',
-      lastUpdated: '2s ago',
-      udmPropertyId: 'prop_02'
-    },
-    {
-      id: 'CAM-NWK-115',
-      name: 'Washington St & Central Ave',
-      agency: 'Newark Code Enforcement',
-      sourceUrl: 'https://munevo.gov/cctv',
-      location: '129 Washington St',
-      address: '129 Washington St, Newark, NJ',
-      ward: 'Central Ward',
-      health: 'ONLINE',
-      fps: 30,
-      aiStatus: 'CRITICAL_ALERT',
-      aiDetection: 'Vacant Building Facade Masonry Decay',
-      confidence: 97,
-      riskLevel: 'CRITICAL',
-      incidentCount: 4,
-      streamUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
-      weather: '68°F Clear',
-      lastUpdated: 'Just now',
-      udmPropertyId: 'prop_03'
-    },
-    {
-      id: 'CAM-BIZ-042',
-      name: 'Ironbound Bank Plaza (Opt-In Partner)',
-      agency: 'Opt-In Business Partner Program',
-      sourceUrl: 'https://munevo.gov/partner-cctv',
-      location: 'Ferry St Plaza Entrance',
-      address: '85 Ferry St, Newark, NJ',
-      ward: 'Ward 1',
-      health: 'ONLINE',
-      fps: 30,
-      aiStatus: 'ACTIVE_ALERT',
-      aiDetection: 'Illegal Dumping / Refuse Accumulation',
-      confidence: 94,
-      riskLevel: 'LOW',
-      incidentCount: 1,
-      streamUrl: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=800&auto=format&fit=crop&q=80',
-      weather: '68°F Clear',
-      lastUpdated: '3s ago',
-      udmPropertyId: 'prop_01'
+      id: 'NJTA-EXIT14',
+      sourceSystem: 'NJTA',
+      sourceAgency: 'New Jersey Turnpike Authority',
+      name: 'NJ Turnpike Exit 14 / Newark Airport Interchange',
+      roadway: 'NJ Turnpike (I-95)',
+      direction: 'Northbound',
+      municipality: 'Newark',
+      state: 'NJ',
+      mediaType: 'REFRESHED_IMAGE',
+      imageUrl: 'https://webcams.nyctmc.org/api/cameras/07f88e60-2b93-4bba-9784-8cac3c9b7f52/image',
+      officialPageUrl: 'https://www.njta.gov/travel-resources/camera-list/',
+      refreshIntervalSeconds: 15,
+      status: 'AVAILABLE',
+      lastSuccessfulFetch: 'Just now',
+      attribution: { agency: 'NJTA', text: 'Official camera feed provided by the New Jersey Turnpike Authority.', url: 'https://www.njta.gov/travel-resources/camera-list/' }
     }
   ]);
+
+  // Connectors Status List State
+  const [connectorsStatus, setConnectorsStatus] = useState<any[]>([
+    { id: 'NYCDOT', name: 'NYC DOT Traffic Cameras', agency: 'NYC DOT', status: 'CONNECTED', mediaType: 'REFRESHED_IMAGE' },
+    { id: 'NJ511', name: 'NJ511 Regional Travel Feeds', agency: 'NJDOT', status: 'CONNECTED', mediaType: 'REFRESHED_IMAGE' },
+    { id: 'NJTA', name: 'NJ Turnpike Authority', agency: 'NJTA', status: 'CONNECTED', mediaType: 'REFRESHED_IMAGE' },
+    { id: 'SHOTSPOTTER', name: 'ShotSpotter Acoustic Sensors', agency: 'Newark Police', status: 'FUTURE_INTEGRATION', mediaType: 'UNAVAILABLE' },
+    { id: 'OPTIN_BIZ', name: 'Opt-In Business CCTV', agency: 'Partner Program', status: 'NOT_CONNECTED', mediaType: 'UNAVAILABLE' }
+  ]);
+
+  // Fetch real cameras and connectors on mount
+  useEffect(() => {
+    fetch('/api/cameras')
+      .then(res => res.json())
+      .then(data => {
+        const arr = ensureArray(data);
+        if (arr.length > 0) setCameras(arr);
+      })
+      .catch(() => {});
+
+    fetch('/api/camera-sources')
+      .then(res => res.json())
+      .then(data => {
+        const arr = ensureArray(data);
+        if (arr.length > 0) {
+          setConnectorsStatus(prev => [
+            ...arr,
+            { id: 'SHOTSPOTTER', name: 'ShotSpotter Acoustic Sensors', agency: 'Newark Police', status: 'FUTURE_INTEGRATION', mediaType: 'UNAVAILABLE' },
+            { id: 'OPTIN_BIZ', name: 'Opt-In Business CCTV', agency: 'Partner Program', status: 'NOT_CONNECTED', mediaType: 'UNAVAILABLE' }
+          ]);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // AI Observations Queue State (Stored in UDM Format)
   const [observations, setObservations] = useState([
@@ -407,19 +372,20 @@ export const SentinelAiConsole: React.FC<SentinelAiConsoleProps> = ({
           <span>Active Feed Connectors:</span>
         </div>
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', flex: 1 }}>
-          {[
-            { name: 'NJ511 Regional', status: 'ACTIVE' },
-            { name: 'NJ Turnpike Authority (NJTA)', status: 'ACTIVE' },
-            { name: 'NYC DOT Regional', status: 'ACTIVE' },
-            { name: 'Newark Public Safety CCTV', status: 'ACTIVE' },
-            { name: 'Opt-In Business Program', status: 'ACTIVE' },
-            { name: 'ShotSpotter Gunshot API', status: 'ACTIVE' }
-          ].map((item, idx) => (
-            <span key={idx} style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '100px', fontSize: '0.7rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }} />
-              {item.name}
-            </span>
-          ))}
+          {connectorsStatus.map((item, idx) => {
+            const isConnected = item.status === 'CONNECTED';
+            const isFuture = item.status === 'FUTURE_INTEGRATION';
+            const badgeColor = isConnected ? '#10b981' : isFuture ? '#a78bfa' : '#ef4444';
+            const badgeBg = isConnected ? 'rgba(16, 185, 129, 0.1)' : isFuture ? 'rgba(167, 139, 250, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+            const borderCol = isConnected ? 'rgba(16, 185, 129, 0.3)' : isFuture ? 'rgba(167, 139, 250, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+
+            return (
+              <span key={idx} style={{ background: badgeBg, color: badgeColor, border: `1px solid ${borderCol}`, padding: '2px 10px', borderRadius: '100px', fontSize: '0.7rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: badgeColor }} />
+                {item.name}: <strong>{item.status.replace('_', ' ')}</strong>
+              </span>
+            );
+          })}
         </div>
         <button
           onClick={() => setShowOptInModal(true)}
@@ -645,7 +611,7 @@ export const SentinelAiConsole: React.FC<SentinelAiConsoleProps> = ({
                         {isPinned && <Pin size={12} style={{ color: '#f59e0b', fill: '#f59e0b' }} />}
                       </div>
                       <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {cam.agency} • {cam.ward}
+                        {cam.sourceAgency || cam.agency} • {cam.roadway || cam.location || 'Regional Corridor'} ({cam.state || 'NJ'})
                       </div>
                     </div>
                     <button
@@ -657,30 +623,32 @@ export const SentinelAiConsole: React.FC<SentinelAiConsoleProps> = ({
                   </div>
 
                   {/* Feed Window */}
-                  <div style={{ position: 'relative', height: '180px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <img src={cam.streamUrl} alt={cam.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'relative', height: '180px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', background: '#090b10' }}>
+                    {cam.imageUrl || cam.streamUrl ? (
+                      <img src={cam.imageUrl || cam.streamUrl} alt={cam.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '8px', color: 'var(--text-muted)' }}>
+                        <Video size={28} />
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700 }}>EXTERNAL OFFICIAL VIEW</span>
+                        <a href={cam.officialPageUrl} target="_blank" rel="noreferrer" style={{ background: '#3b82f6', color: '#fff', padding: '4px 10px', borderRadius: '4px', fontSize: '0.68rem', textDecoration: 'none', fontWeight: 700 }}>
+                          Open Official View
+                        </a>
+                      </div>
+                    )}
                     
-                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', padding: '2px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', fontWeight: 800, color: '#10b981' }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} className="animate-pulse" />
-                      <span>LIVE 30 FPS</span>
+                    {/* Media Type Badge */}
+                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', padding: '2px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', fontWeight: 800, color: cam.mediaType === 'LIVE_VIDEO' ? '#10b981' : '#3b82f6' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: cam.mediaType === 'LIVE_VIDEO' ? '#10b981' : '#3b82f6' }} className="animate-pulse" />
+                      <span>{cam.mediaType === 'LIVE_VIDEO' ? 'LIVE VIDEO' : cam.mediaType === 'REFRESHED_IMAGE' ? `REFRESHED IMAGE (${cam.refreshIntervalSeconds || 15}s)` : 'OFFICIAL VIEW'}</span>
                     </div>
 
-                    {cam.aiStatus !== 'NORMAL' && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '25%',
-                        left: '20%',
-                        right: '20%',
-                        bottom: '25%',
-                        border: `2px dashed ${cam.riskLevel === 'CRITICAL' ? '#ef4444' : '#f97316'}`,
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        padding: '4px'
-                      }}>
-                        <span style={{ background: cam.riskLevel === 'CRITICAL' ? '#ef4444' : '#f97316', color: '#fff', fontSize: '0.6rem', fontWeight: 900, padding: '2px 6px', borderRadius: '4px' }}>
-                          🤖 AI DETECTED: {cam.aiDetection} ({cam.confidence}%)
-                        </span>
+                    {/* Source Attribution Overlay */}
+                    {cam.attribution && (
+                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(10, 12, 18, 0.88)', padding: '4px 8px', fontSize: '0.62rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Source: {cam.attribution.agency}</span>
+                        <a href={cam.officialPageUrl} target="_blank" rel="noreferrer" style={{ color: '#a78bfa', textDecoration: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          Official Page <ExternalLink size={10} />
+                        </a>
                       </div>
                     )}
                   </div>
@@ -694,7 +662,7 @@ export const SentinelAiConsole: React.FC<SentinelAiConsoleProps> = ({
                       <Maximize2 size={12} /> Expand
                     </button>
                     <button
-                      onClick={() => onOpenChart && onOpenChart('property', cam.udmPropertyId)}
+                      onClick={() => onOpenChart && onOpenChart('property', 'prop_01')}
                       style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#3b82f6', padding: '6px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}
                     >
                       <MapPin size={12} /> UDM Parcel
@@ -706,10 +674,10 @@ export const SentinelAiConsole: React.FC<SentinelAiConsoleProps> = ({
                       <Camera size={12} /> Snapshot
                     </button>
                     <button
-                      onClick={() => addNotification(`Logged emergency observation for ${cam.name}`)}
+                      onClick={() => addNotification(`Logged manual observation for ${cam.name}`)}
                       style={{ background: 'rgba(139, 92, 246, 0.15)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}
                     >
-                      <Plus size={12} /> Incident
+                      <Plus size={12} /> Observation
                     </button>
                   </div>
                 </div>

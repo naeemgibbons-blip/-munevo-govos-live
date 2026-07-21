@@ -410,3 +410,82 @@ model DemoRequest {
   notes          String?
   createdAt      DateTime     @default(now())
 }
+
+// 16. Sentinel Camera Source Registry
+model CameraSource {
+  id                  String         @id @default(uuid())
+  name                String         // e.g. "NYC DOT Traffic Cameras", "NJ511 Regional", "NJ Turnpike Authority"
+  agency              String         // e.g. "NYC DOT", "NJDOT", "NJTA"
+  jurisdiction        String         // e.g. "New York / New Jersey Metro"
+  connectorType       String         // e.g. "NYCDOT", "NJ511", "NJTA", "EXTERNAL"
+  baseUrl             String
+  status              String         @default("CONNECTED") // "CONNECTED" | "DEGRADED" | "OFFLINE" | "TERMS_REVIEW"
+  mediaCapabilities   String         @default("REFRESHED_IMAGE") // JSON or comma-separated
+  attributionText     String
+  attributionUrl      String
+  termsStatus         String         @default("VERIFIED")
+  enabled             Boolean        @default(true)
+  lastSuccessfulSync  DateTime?
+  lastError           String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @default(now()) @updatedAt
+
+  cameras             PublicCamera[]
+}
+
+// 17. Public Camera Canonical Model
+model PublicCamera {
+  id                     String             @id @default(uuid())
+  cameraSourceId         String
+  cameraSource           CameraSource       @relation(fields: [cameraSourceId], references: [id], onDelete: Cascade)
+  sourceCameraId         String             // Provider's camera ID (e.g. UUID or integer)
+  
+  name                   String
+  roadway                String?
+  direction              String?
+  intersection           String?
+  municipality           String?
+  county                 String?
+  state                  String?            @default("NJ")
+  latitude               Float?
+  longitude              Float?
+  
+  mediaType              String             @default("REFRESHED_IMAGE") // "LIVE_VIDEO" | "REFRESHED_IMAGE" | "OFFICIAL_EMBED" | "EXTERNAL_VIEW" | "UNAVAILABLE"
+  officialPageUrl        String
+  imageUrl               String?
+  streamUrl              String?
+  embedUrl               String?
+  
+  refreshIntervalSeconds Int                @default(15)
+  sourceTimestamp        DateTime?
+  status                 String             @default("AVAILABLE") // "AVAILABLE" | "STALE" | "OFFLINE" | "RATE_LIMITED" | "ERROR"
+  lastSuccessfulFetch    DateTime?
+  
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @default(now()) @updatedAt
+
+  observations           CameraObservation[]
+
+  @@unique([cameraSourceId, sourceCameraId])
+}
+
+// 18. Camera Observation Workflow Model
+model CameraObservation {
+  id                 String       @id @default(uuid())
+  cameraId           String
+  camera             PublicCamera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  organizationId     String?
+  
+  category           String       // e.g. "Congestion", "Flooding", "Possible Crash", "Illegal Dumping"
+  severity           String       @default("LOW") // "LOW" | "HIGH" | "CRITICAL"
+  confidence         Float        @default(90.0)
+  status             String       @default("NEW") // "NEW" | "VERIFIED" | "DISCARDED" | "ROUTED"
+  notes              String?
+  sourceTimestamp    DateTime     @default(now())
+  snapshotReference  String?
+  createdByUserId    String?
+  verifiedByUserId   String?
+  
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+}

@@ -4,6 +4,8 @@ import { PrismaClient } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
+import { CameraSyncService } from './src/services/cameras/core/CameraSyncService.js';
+import { CameraConnectorRegistry } from './src/services/cameras/core/CameraConnectorRegistry.js';
 
 function loadEnvFile(filePath: string) {
   try {
@@ -2113,6 +2115,92 @@ app.post('/api/sentinel/cameras/opt-in', async (req, res) => {
       health: 'CONNECTED_ONLINE',
       aiStatus: 'INITIALIZED'
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 44. GET /api/camera-sources: List Camera Connector Sources
+app.get('/api/camera-sources', async (req, res) => {
+  try {
+    const syncService = CameraSyncService.getInstance();
+    const sources = syncService.getConnectorStatusList();
+    res.json(sources);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 45. GET /api/camera-sources/:id/health: Test connector health
+app.get('/api/camera-sources/:id/health', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const registry = CameraConnectorRegistry.getInstance();
+    const connector = registry.get(id.toUpperCase());
+    if (!connector) {
+      return res.status(404).json({ error: `Connector ${id} not found.` });
+    }
+    const health = await connector.testConnection();
+    res.json({ id, health });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 46. POST /api/camera-sources/:id/sync: Trigger camera sync
+app.post('/api/camera-sources/:id/sync', async (req, res) => {
+  try {
+    const syncService = CameraSyncService.getInstance();
+    const result = await syncService.syncAllConnectors();
+    res.json({ status: 'synced', total: result.total, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 47. GET /api/cameras: Canonical list of normalized cameras
+app.get('/api/cameras', async (req, res) => {
+  try {
+    const syncService = CameraSyncService.getInstance();
+    const cameras = await syncService.getActiveCameras();
+    res.json(cameras);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 48. GET /api/cameras/:id: Single normalized camera record
+app.get('/api/cameras/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const syncService = CameraSyncService.getInstance();
+    const cameras = await syncService.getActiveCameras();
+    const found = cameras.find(c => c.id === id || c.sourceCameraId === id);
+    if (!found) {
+      return res.status(404).json({ error: 'Camera not found' });
+    }
+    res.json(found);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 49. POST /api/cameras/:id/observations: Create manual camera observation
+app.post('/api/cameras/:id/observations', async (req, res) => {
+  const { id } = req.params;
+  const { category, severity, notes, organizationId } = req.body;
+  try {
+    const newObs = {
+      id: `OBS-${Math.floor(1000 + Math.random() * 9000)}`,
+      cameraId: id,
+      category: category || 'General Incident',
+      severity: severity || 'LOW',
+      notes: notes || 'Operator manual observation logged from live feed.',
+      confidence: 100.0,
+      status: 'VERIFIED',
+      createdAt: new Date().toISOString()
+    };
+    res.status(201).json(newObs);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
