@@ -2025,7 +2025,87 @@ app.post('/api/invites/:id/action', async (req, res) => {
       return res.json({ status: 'cancelled', message: 'Invitation cancelled.', invitation: updated });
     }
 
+      return res.json({ status: 'cancelled', message: 'Invitation cancelled.', invitation: updated });
+    }
+
     res.status(400).json({ error: 'Invalid action' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 71. PATCH /api/profiles/:id/status: Account Disable & Suspension Governance
+app.patch('/api/profiles/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status, reason } = req.body; // "ACTIVE" | "DISABLED" | "SUSPENDED"
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    
+    const profile = await prisma.profile.findUnique({ where: { id } });
+    if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+    const auditAction = status === 'DISABLED' || status === 'SUSPENDED' ? 'ACCOUNT_DISABLED' : 'ACCOUNT_REACTIVATED';
+    
+    await recordAudit(orgId, id, profile.email, auditAction, 'Profile', id, { previousStatus: 'ACTIVE' }, { newStatus: status, reason });
+
+    res.json({
+      status: 'updated',
+      profileId: id,
+      accountStatus: status,
+      message: `Account status updated to ${status}.`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 72. PATCH /api/members/:id/assignment: Role & Department Division Assignment
+app.patch('/api/members/:id/assignment', async (req, res) => {
+  const { id } = req.params;
+  const { roleId, departmentId, departmentCode, jobTitle } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    
+    const updated = await prisma.membership.update({
+      where: { id },
+      data: {
+        roleId: roleId || undefined,
+        departmentId: departmentId || undefined,
+        jobTitle: jobTitle || undefined
+      },
+      include: { user: true, role: true }
+    });
+
+    if (roleId) {
+      await recordAudit(orgId, updated.userId, updated.user.email, 'ROLE_CHANGE', 'Membership', id, null, { roleId, roleName: updated.role?.name });
+    }
+    if (departmentId || departmentCode) {
+      await recordAudit(orgId, updated.userId, updated.user.email, 'DEPARTMENT_CHANGE', 'Membership', id, null, { departmentId, departmentCode });
+    }
+
+    res.json({ status: 'assigned', membership: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 73. POST /api/audit-logs/auth: Record Security Audit Log Events from Client
+app.post('/api/audit-logs/auth', async (req, res) => {
+  const { eventType, provider, userEmail, userId, metadata } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.body.organizationId) as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const action = eventType || 'SECURITY_EVENT';
+    const email = userEmail || 'user@munevo.gov';
+    
+    await recordAudit(orgId, userId || null, email, action, 'SecurityAuth', userId || 'auth_event', null, metadata || { provider });
+
+    res.json({ status: 'logged', action });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

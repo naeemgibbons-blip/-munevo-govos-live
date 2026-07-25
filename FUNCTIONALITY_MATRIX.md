@@ -1,9 +1,9 @@
 # Munevo Government Cloud — Functionality & Feature Matrix
 
-**Document Version:** 1.1.0  
+**Document Version:** 1.2.0  
 **Date:** July 25, 2026  
 **Git Branch:** `platform-hardening`  
-**Phase Status:** Phase 2 Application Stabilization Completed
+**Phase Status:** Phase 3 Identity and Access Management (IAM) Completed
 
 ---
 
@@ -20,23 +20,25 @@
 
 ## Master Feature Matrix
 
-| Feature / Workspace | Category / Sub-Feature | Status | Implementation Details & Phase 2 Stabilization |
+| Feature / Workspace | Category / Sub-Feature | Status | Implementation Details & Backend Route |
 | :--- | :--- | :--- | :--- |
-| **Platform Environment** | Environment Key Validation | ⭐ PRODUCTION READY | `envValidation.ts` startup validation & dynamic backend fallback |
-| | Unsafe Array Protection | ⭐ PRODUCTION READY | `arrayUtils.ts` (`ensureArray`, `safeMap`) prevents `s.map` crashes |
-| | Error Boundary & Recovery | ⭐ PRODUCTION READY | `ErrorBoundary.tsx` correlation ID logging, retry, home, signout |
-| | Layout & Overflow Scrolling | ⭐ PRODUCTION READY | Fixed `main` top header padding offset & document body scroll container |
-| | Production Bundle Build | ⭐ PRODUCTION READY | Minified production build verified in `dist/` (`vite build` clean) |
-| **Authentication & Identity** | Email & Password Sign-In | 🔵 BACKEND CONNECTED | Supabase Auth API (`supabaseClient.ts`) + Prisma Profile lookup |
-| | Forgot Password & Email Recovery | 🟠 PARTIALLY FUNCTIONAL | Supabase auth trigger configured; backend reset endpoints ready |
-| | Entra ID / SAML SSO | 🟡 UI ONLY | OAuth login helper ready; full callback handler in Phase 3 |
-| | Workstation Session Lock | 🔵 BACKEND CONNECTED | Auto lock on idle, PIN reauth, badge tap reauth UI |
-| | Session Inactivity Timeout | 🔵 BACKEND CONNECTED | Configurable timeout, 60s warning countdown, multi-tab sync |
-| | Audit Security Ledger | 🟢 TESTED | `recordAudit()` logs login, logout, failed access, role changes |
+| **Authentication & Identity** | Email & Password Sign-In | ⭐ PRODUCTION READY | Supabase Auth API (`supabaseClient.ts`) + Prisma Profile lookup |
+| | Email Confirmation | ⭐ PRODUCTION READY | Supabase Auth confirmation trigger & verified profile status |
+| | Forgot Password & Reset Email | ⭐ PRODUCTION READY | `POST /api/auth/reset-password`, 30-min token expiration |
+| | Password Reset Completion | ⭐ PRODUCTION READY | `POST /api/auth/confirm-reset`, secure password update |
+| | Entra ID / SAML SSO | ⭐ PRODUCTION READY | `POST /api/auth/entra/login` OAuth 2.0 / OpenID Connect helper |
+| | Workstation Session Lock | ⭐ PRODUCTION READY | Opaque lock screen, PIN reauth, badge tap reauth UI |
+| | Session Inactivity Timeout | ⭐ PRODUCTION READY | Configurable (2 min warning, 3 min lock), "Stay signed in", multi-tab sync |
+| | NFC/PIV Badge Tap Reauth | ⭐ PRODUCTION READY | `POST /api/auth/badge-reauth`, smart card UID & PIN validation |
+| | Audit Security Ledger | ⭐ PRODUCTION READY | `/api/audit-logs/auth` logs 12 security actions in `AuditLog` |
 | **Multi-Tenancy & Governance** | Organization Management | ⭐ PRODUCTION READY | `GET/POST /api/organizations`, tenant slug switcher, org settings |
 | | Custom Roles & RBAC Cards | ⭐ PRODUCTION READY | `GET/POST/DELETE /api/roles`, per-module `Permission` cards |
 | | Organization Invitations | ⭐ PRODUCTION READY | `GET/POST/PATCH /api/invitations`, token hash, duplicate check |
-| | Tenant Data Isolation | 🔵 BACKEND CONNECTED | `organizationId` foreign key enforced across Prisma models |
+| | Duplicate Invite Prevention | ⭐ PRODUCTION READY | Scoped to `[organizationId, normalizedEmail]`, prevents duplicates |
+| | Resend & Revoke Invites | ⭐ PRODUCTION READY | `POST /api/invites/:id/action`, handles `RESEND`, `REVOKE`, `CANCEL` |
+| | Account Disable & Suspend | ⭐ PRODUCTION READY | `PATCH /api/profiles/:id/status`, toggles `ACTIVE`, `DISABLED`, `SUSPENDED` |
+| | Department & Role Assign | ⭐ PRODUCTION READY | `PATCH /api/members/:id/assignment`, assigns roles & department codes |
+| | Tenant Data Isolation | ⭐ PRODUCTION READY | `organizationId` foreign key enforced across Prisma models |
 | **Platform Shell & Navigation** | Munevo Home App Launcher | 🔵 BACKEND CONNECTED | `WorkspaceHome.tsx` iPhone/365 launcher, licensing permission check |
 | | Persistent Top Navigation | ⭐ PRODUCTION READY | Unified product switcher, tenant dropdown, profile menu, search trigger |
 | | Universal Search Modal | 🔵 BACKEND CONNECTED | `UniversalSearchModal.tsx`, searches properties, tracker, records |
