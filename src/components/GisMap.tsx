@@ -56,12 +56,24 @@ export const GisMap: React.FC<GisMapProps> = ({
   // Layers State
   const [layers, setLayers] = useState({
     parcels: true,
+    cameras: true,
     waterMains: false,
     sewerLines: false,
     zoning: false,
     wards: false,
     projects: true
   });
+
+  const [camerasList, setCamerasList] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetch('/api/cameras')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setCamerasList(data);
+      })
+      .catch(() => {});
+  }, []);
 
   // Address Intelligence Search States
   const [searchVal, setSearchVal] = useState('');
@@ -288,11 +300,74 @@ export const GisMap: React.FC<GisMapProps> = ({
               </Marker>
             )}
 
+            {/* Render Camera Markers */}
+            {layers.cameras && camerasList.map(cam => {
+              if (!cam.latitude || !cam.longitude) return null;
+              const isAvailable = cam.status === 'AVAILABLE';
+              const markerColor = isAvailable ? '#8b5cf6' : '#ef4444';
+
+              return (
+                <Marker 
+                  key={`cam-${cam.id}`} 
+                  position={[cam.latitude, cam.longitude]} 
+                  icon={createCustomIcon(markerColor)}
+                >
+                  <Popup>
+                    <div style={{ fontSize: '11px', color: '#333', lineHeight: '1.4', minWidth: '220px' }}>
+                      <strong style={{ display: 'block', fontSize: '12px', color: '#8b5cf6' }}>📹 {cam.name}</strong>
+                      <span><strong>Agency:</strong> {cam.sourceAgency || cam.attribution?.agency}</span><br />
+                      <span><strong>Roadway:</strong> {cam.roadway || 'Corridor'} {cam.direction ? `(${cam.direction})` : ''}</span><br />
+                      <span><strong>Media Type:</strong> {cam.mediaType}</span><br />
+                      <span><strong>Health:</strong> {cam.status}</span><br />
+                      <span><strong>Last Update:</strong> {cam.lastSuccessfulFetch ? 'Just now' : 'N/A'}</span>
+
+                      {/* Media Preview */}
+                      {cam.imageUrl && (
+                        <div style={{ width: '100%', height: '100px', margin: '6px 0', borderRadius: '4px', overflow: 'hidden' }}>
+                          <img src={cam.imageUrl} alt={cam.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                        <a 
+                          href={cam.officialPageUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          style={{ background: '#3b82f6', color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '9px', textDecoration: 'none', fontWeight: 600 }}
+                        >
+                          Open Official Source
+                        </a>
+                        <button 
+                          onClick={() => {
+                            fetch(`/api/cameras/${cam.id}/observations`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ category: 'GIS Spatial Observation', notes: 'Logged from GIS Map view.' })
+                            })
+                              .then(res => res.json())
+                              .then(() => addNotification(`Created camera observation for ${cam.name} from GIS map.`))
+                              .catch(() => {});
+                          }}
+                          style={{ background: '#8b5cf6', color: '#fff', border: 0, padding: '3px 6px', borderRadius: '4px', fontSize: '9px', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          + Create Observation
+                        </button>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+
           </MapContainer>
         </div>
 
         {/* Map Legend */}
         <div style={{ display: 'flex', gap: '16px', fontSize: '0.75rem', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#8b5cf6' }}></span>
+            <span style={{ color: 'var(--text-secondary)' }}>Public Camera</span>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--primary-color)' }}></span>
             <span style={{ color: 'var(--text-secondary)' }}>Permit</span>

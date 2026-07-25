@@ -20,9 +20,15 @@ export class NJ511Connector implements CameraConnector {
     supportsRefreshedImage: true,
     supportsLiveVideo: true,
     supportsOfficialEmbed: false,
-    supportsExternalLinkOnly: true,
+    supportsExternalLinkOnly: false,
     supportsHealthCheck: true,
-    supportsEventMetadata: true
+    supportsTimestamps: true,
+    supportsRoadwayData: true,
+    supportsTrafficDirection: true,
+    supportsEventMetadata: true,
+    supportsSnapshotRetention: true,
+    supportsAiAnalysis: true,
+    supportsThirdPartyDisplay: true
   };
 
   public getAttribution(): CameraAttribution {
@@ -107,7 +113,8 @@ export class NJ511Connector implements CameraConnector {
       url: camera?.imageUrl,
       officialPageUrl: 'https://511nj.org/camera',
       lastRefreshedAt: new Date().toISOString(),
-      attribution: this.getAttribution()
+      attribution: this.getAttribution(),
+      permissions: camera?.permissions
     };
   }
 

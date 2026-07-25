@@ -38,6 +38,15 @@ model Organization {
   verificationClaims  VerificationClaim[]
   appointments        Appointment[]
   caseComments        CaseComment[]
+  departments         Department[]
+  addresses           Address[]
+  people              Person[]
+  workflows           Workflow[]
+  documents           Document[]
+  activities          Activity[]
+  notifications       Notification[]
+  workspaceInstallations WorkspaceInstallation[]
+  integrationConnections IntegrationConnection[]
 }
 
 // 2. Custom Role System (Isolated Per Org)
@@ -489,3 +498,253 @@ model CameraObservation {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @default(now()) @updatedAt
 }
+
+// 19. Business Opt-In Camera Program Model
+model BusinessCameraOptIn {
+  id                    String    @id @default(uuid())
+  organizationId        String?
+  businessName          String
+  businessTaxId         String?
+  propertyAddress       String
+  contactEmail          String
+  contactPhone          String?
+  
+  streamType            String    @default("REFRESHED_IMAGE") // "RTSP" | "HTTPS_STREAM" | "REFRESHED_IMAGE"
+  streamUrl             String
+  
+  verificationStatus    String    @default("PENDING_VERIFICATION") // "PENDING_VERIFICATION" | "OWNERSHIP_VERIFIED" | "APPROVED" | "ACTIVE" | "REJECTED" | "REVOKED"
+  verificationNotes     String?
+  
+  connectionTested      Boolean   @default(false)
+  connectionHealth      String    @default("NOT_TESTED") // "CONNECTED" | "FAILED" | "NOT_TESTED"
+  
+  // Sharing Permissions (JSON structure for granular preferences)
+  mayStreamLive         Boolean   @default(true)
+  mayAnalyzeAI          Boolean   @default(true)
+  mayRetainSnapshots    Boolean   @default(true)
+  shareEmergencyOnly    Boolean   @default(false)
+  shareBusinessHoursOnly Boolean  @default(false)
+  
+  installedCameraId     String?
+  
+  appliedAt             DateTime  @default(now())
+  approvedAt            DateTime?
+  approvedByUserId      String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now()) @updatedAt
+}
+
+// 20. Municipal Department Model
+model Department {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  name           String       // e.g., "Public Works & Sanitation", "Code Enforcement"
+  code           String       // e.g., "DPW", "CODE", "FIRE"
+  headName       String?
+  headEmail      String?
+  status         String       @default("ACTIVE")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+
+  @@unique([organizationId, name])
+}
+
+// 21. Canonical Address Model
+model Address {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  streetAddress  String
+  unitNumber     String?
+  city           String       @default("Newark")
+  state          String       @default("NJ")
+  zipCode        String
+  ward           String?
+  district       String?
+  block          String?
+  lot            String?
+  latitude       Float?
+  longitude      Float?
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+
+  @@index([organizationId, streetAddress])
+}
+
+// 22. Canonical Person / Resident Model
+model Person {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  personType     String       @default("RESIDENT") // "RESIDENT" | "PROPERTY_OWNER" | "CONTRACTOR" | "BUSINESS_OWNER"
+  address        String?
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+
+  @@index([organizationId, email])
+}
+
+// 23. Workflow Engine Models
+model Workflow {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  title          String
+  module         String         // "311" | "Permits" | "CodeEnforcement" | "EmergencyCAD"
+  triggerCategory String        // e.g. "Pothole", "Flooding", "Building Permit"
+  status         String         @default("ACTIVE") // "ACTIVE" | "PAUSED" | "DRAFT"
+  steps          WorkflowStep[]
+  
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @default(now()) @updatedAt
+}
+
+model WorkflowStep {
+  id             String       @id @default(uuid())
+  workflowId     String
+  workflow       Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  stepNumber     Int
+  stepName       String       // e.g., "Address Validation", "Supervisor Review", "Field Dispatch"
+  assignedDept   String?
+  autoAction     String?      // e.g., "ASSIGN_CORRIDOR_CREW", "DRAFT_WORK_ORDER", "NOTIFY_SUPERVISOR"
+  slaHours       Int          @default(24)
+  
+  createdAt      DateTime     @default(now())
+}
+
+// 24. Unified Document Repository Model
+model Document {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  title          String
+  fileName       String
+  fileSize       Int
+  mimeType       String
+  fileUrl        String
+  recordType     String       // "Property" | "Permit" | "TrackerItem" | "Inspection" | "OpenRecordsRequest"
+  recordId       String
+  uploadedBy     String
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+
+  @@index([organizationId, recordId])
+}
+
+// 25. Unified Activity Timeline Ledger Model
+model Activity {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  recordType     String       // "Property" | "TrackerItem" | "Permit" | "Camera" | "Incident"
+  recordId       String
+  actorName      String
+  actorEmail     String?
+  action         String       // "CREATED" | "STATUS_CHANGED" | "ASSIGNED" | "WORK_COMPLETED" | "VERIFIED"
+  notes          String?
+  metadata       Json?
+  
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, recordType, recordId])
+}
+
+// 26. Notification Center Model
+model Notification {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  
+  title          String
+  message        String
+  type           String       @default("INFO") // "INFO" | "WARNING" | "CRITICAL" | "WORKFLOW"
+  read           Boolean      @default(false)
+  linkUrl        String?
+  
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, userId])
+}
+
+// 27. Workspace Catalog & Installations Model
+model WorkspaceCatalog {
+  id             String                  @id @default(uuid())
+  productId      String                  @unique // e.g. "core", "sentinel", "safe", "gis", "legislative"
+  name           String
+  description    String
+  iconName       String
+  category       String                  @default("MUNICIPAL_OPERATIONS")
+  isCore         Boolean                 @default(false)
+  
+  installations  WorkspaceInstallation[]
+}
+
+model WorkspaceInstallation {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId    String
+  workspace      WorkspaceCatalog @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  status         String           @default("ACTIVE") // "ACTIVE" | "SUSPENDED"
+  installedAt    DateTime         @default(now())
+
+  @@unique([organizationId, workspaceId])
+}
+
+// 28. User Workspace Preferences Model
+model UserWorkspacePreference {
+  id             String       @id @default(uuid())
+  userId         String       @unique
+  pinnedWorkspaces String     @default("core,sentinel,safe,gis") // Comma-separated list
+  defaultWorkspace String     @default("core")
+  savedLayout    Json?
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+}
+
+// 29. Integration & Connections Model
+model Integration {
+  id             String                  @id @default(uuid())
+  providerKey    String                  @unique // e.g. "ENTRA_ID", "ARCGIS_GIS", "SHOTSPOTTER", "NJ511"
+  name           String
+  description    String
+  category       String                  @default("IDENTITY")
+  
+  connections    IntegrationConnection[]
+}
+
+model IntegrationConnection {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integrationId  String
+  integration    Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  status         String       @default("CONNECTED") // "CONNECTED" | "DEGRADED" | "DISCONNECTED"
+  configSettings Json?
+  lastSyncAt     DateTime?
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+
+  @@unique([organizationId, integrationId])
+}
+

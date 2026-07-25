@@ -15,13 +15,19 @@ export class CameraConnectorRegistry {
     return CameraConnectorRegistry.instance;
   }
 
-  public register(connector: CameraConnector, enabled = true): void {
-    this.connectors.set(connector.id, connector);
-    this.enabledStates.set(connector.id, enabled);
+  public register(connector: CameraConnector, enabled = true): boolean {
+    const key = connector.id.toUpperCase();
+    if (this.connectors.has(key)) {
+      console.warn(`[CameraConnectorRegistry] Connector ${key} is already registered. Skipping duplicate registration.`);
+      return false;
+    }
+    this.connectors.set(key, connector);
+    this.enabledStates.set(key, enabled);
+    return true;
   }
 
   public get(id: string): CameraConnector | undefined {
-    return this.connectors.get(id);
+    return this.connectors.get(id.toUpperCase());
   }
 
   public getAll(): CameraConnector[] {
@@ -29,17 +35,19 @@ export class CameraConnectorRegistry {
   }
 
   public getEnabled(): CameraConnector[] {
-    return this.getAll().filter(c => this.enabledStates.get(c.id) !== false);
+    return this.getAll().filter(c => this.isEnabled(c.id));
   }
 
   public setEnabled(id: string, enabled: boolean): void {
-    if (this.connectors.has(id)) {
-      this.enabledStates.set(id, enabled);
+    const key = id.toUpperCase();
+    if (this.connectors.has(key)) {
+      this.enabledStates.set(key, enabled);
     }
   }
 
   public isEnabled(id: string): boolean {
-    return this.enabledStates.get(id) ?? false;
+    const key = id.toUpperCase();
+    return this.enabledStates.get(key) ?? false;
   }
 
   public async getHealthAll(): Promise<Record<string, ConnectorHealth>> {

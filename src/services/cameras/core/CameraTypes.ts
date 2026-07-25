@@ -84,7 +84,13 @@ export interface CameraConnectorCapabilities {
   supportsOfficialEmbed: boolean;
   supportsExternalLinkOnly: boolean;
   supportsHealthCheck: boolean;
+  supportsTimestamps: boolean;
+  supportsRoadwayData: boolean;
+  supportsTrafficDirection: boolean;
   supportsEventMetadata: boolean;
+  supportsSnapshotRetention: boolean;
+  supportsAiAnalysis: boolean;
+  supportsThirdPartyDisplay: boolean;
 }
 
 export interface ConnectorHealth {
@@ -102,4 +108,5 @@ export interface CameraMediaResult {
   officialPageUrl: string;
   lastRefreshedAt: string;
   attribution: CameraAttribution;
+  permissions?: CameraPermissions;
 }

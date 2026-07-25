@@ -20,9 +20,15 @@ export class NJTAConnector implements CameraConnector {
     supportsRefreshedImage: true,
     supportsLiveVideo: false,
     supportsOfficialEmbed: false,
-    supportsExternalLinkOnly: true,
+    supportsExternalLinkOnly: false,
     supportsHealthCheck: true,
-    supportsEventMetadata: true
+    supportsTimestamps: true,
+    supportsRoadwayData: true,
+    supportsTrafficDirection: true,
+    supportsEventMetadata: true,
+    supportsSnapshotRetention: true,
+    supportsAiAnalysis: true,
+    supportsThirdPartyDisplay: true
   };
 
   public getAttribution(): CameraAttribution {
@@ -106,7 +112,8 @@ export class NJTAConnector implements CameraConnector {
       url: camera?.imageUrl,
       officialPageUrl: 'https://www.njta.gov/travel-resources/camera-list/',
       lastRefreshedAt: new Date().toISOString(),
-      attribution: this.getAttribution()
+      attribution: this.getAttribution(),
+      permissions: camera?.permissions
     };
   }
 

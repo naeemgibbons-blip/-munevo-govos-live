@@ -793,59 +793,139 @@ export const SentinelAiConsole: React.FC<SentinelAiConsoleProps> = ({
         </div>
       )}
 
-      {/* OPT-IN MODAL */}
+      {/* OPT-IN WIZARD MODAL (7-STEP LIFECYCLE) */}
       {showOptInModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 11000 }}>
-          <div className="glass-card" style={{ width: '480px', padding: '24px', background: '#12141c', border: '1px solid #10b981', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 11000 }}>
+          <div className="glass-card" style={{ width: '640px', padding: '24px', background: '#0e1017', border: '1px solid #10b981', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Register Business Opt-In Camera Feed</div>
+              <div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff' }}>Business Opt-In Camera Access Lifecycle</div>
+                <div style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>Sentinel Municipal CCTV Partnership Program</div>
+              </div>
               <button onClick={() => setShowOptInModal(false)} style={{ background: 'none', border: 0, color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
+
+            {/* Lifecycle Progress Steps Ticker */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', fontSize: '0.62rem', fontWeight: 700 }}>
+              {[
+                '1. Apply',
+                '2. Verify',
+                '3. Test',
+                '4. Install',
+                '5. Permissions',
+                '6. Sentinel',
+                '7. Audit Logged'
+              ].map((stepLabel, idx) => (
+                <div key={idx} style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '6px 2px', borderRadius: '4px' }}>
+                  {stepLabel}
+                </div>
+              ))}
+            </div>
             
-            <form onSubmit={handleRegisterOptInCamera} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Business / Entity Name</label>
-                <input 
-                  type="text" 
-                  className="ai-input" 
-                  placeholder="e.g. Ironbound National Bank"
-                  value={optInBizName} 
-                  onChange={e => setOptInBizName(e.target.value)}
-                  style={{ width: '100%' }}
-                  required
-                />
+            <form onSubmit={handleRegisterOptInCamera} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              
+              {/* Step 1: Business Applies */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#10b981', color: '#fff', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>1</span>
+                  <span>Business Applies & Provides Stream Endpoint</span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '3px' }}>Business / Entity Name</label>
+                    <input 
+                      type="text" 
+                      className="ai-input" 
+                      placeholder="e.g. Ironbound National Bank"
+                      value={optInBizName} 
+                      onChange={e => setOptInBizName(e.target.value)}
+                      style={{ width: '100%' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '3px' }}>Property Address (UDM Parcel)</label>
+                    <input 
+                      type="text" 
+                      className="ai-input" 
+                      placeholder="e.g. 85 Ferry St, Newark, NJ"
+                      value={optInAddress} 
+                      onChange={e => setOptInAddress(e.target.value)}
+                      style={{ width: '100%' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '3px' }}>Camera RTSP / HTTPS Stream URL</label>
+                  <input 
+                    type="text" 
+                    className="ai-input" 
+                    placeholder="https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=800&auto=format&fit=crop&q=80"
+                    defaultValue="https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=800&auto=format&fit=crop&q=80"
+                    style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.75rem' }}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Camera Location Address</label>
-                <input 
-                  type="text" 
-                  className="ai-input" 
-                  placeholder="e.g. 85 Ferry St, Newark, NJ"
-                  value={optInAddress} 
-                  onChange={e => setOptInAddress(e.target.value)}
-                  style={{ width: '100%' }}
-                  required
-                />
+              {/* Step 2: City Verifies Ownership */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#3b82f6', color: '#fff', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
+                  <span>City Ownership Verification & Parcel Check</span>
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                  ✓ Automated UDM Deed check against Tax Assessment database.<br/>
+                  ✓ City Clerk ownership verification logged.
+                </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
+              {/* Step 5: Business Chooses Sharing Permissions */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#8b5cf6', color: '#fff', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>5</span>
+                  <span>Business Chooses Sharing Permissions</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '6px' }}>
+                    <input type="checkbox" defaultChecked style={{ accentColor: '#10b981' }} />
+                    <span style={{ fontSize: '0.72rem', color: '#fff' }}>Share Live Video Stream</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '6px' }}>
+                    <input type="checkbox" defaultChecked style={{ accentColor: '#10b981' }} />
+                    <span style={{ fontSize: '0.72rem', color: '#fff' }}>Authorize AI Computer Vision</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '6px' }}>
+                    <input type="checkbox" defaultChecked style={{ accentColor: '#10b981' }} />
+                    <span style={{ fontSize: '0.72rem', color: '#fff' }}>Retain Snapshot Frames</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '6px' }}>
+                    <input type="checkbox" style={{ accentColor: '#10b981' }} />
+                    <span style={{ fontSize: '0.72rem', color: '#fff' }}>Emergency Call-Out Only</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '10px', borderRadius: '8px' }}>
                 <input 
                   type="checkbox" 
                   checked={optInConsent} 
                   onChange={e => setOptInConsent(e.target.checked)}
                   style={{ accentColor: '#10b981', width: '16px', height: '16px' }}
                 />
-                <span style={{ fontSize: '0.72rem', color: '#fff' }}>I explicitly authorize sharing this exterior camera stream with Newark Municipal EOC.</span>
+                <span style={{ fontSize: '0.72rem', color: '#fff' }}>I explicitly authorize sharing this camera feed with Newark EOC. Every access will be logged to audit ledger.</span>
               </div>
 
               <button 
                 type="submit" 
-                style={{ background: '#10b981', color: '#fff', border: 0, padding: '10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '6px' }}
+                style={{ background: '#10b981', color: '#fff', border: 0, padding: '12px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '4px' }}
               >
-                Authorize & Connect Stream
+                Execute 7-Step Lifecycle: Verify, Connect & Publish to Sentinel
               </button>
             </form>
           </div>
