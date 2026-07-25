@@ -2440,8 +2440,11 @@ app.get('/api/camera-observations', async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
-});
-
+// 52. PATCH /api/camera-observations/:id: Update observation status
+app.patch('/api/camera-observations/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status, notes, verifiedByUserId } = req.body;
+  try {
     res.json({
       id,
       status: status || 'VERIFIED',

@@ -4,6 +4,30 @@ All notable changes made during the **Munevo Platform Hardening and Functionalit
 
 ---
 
+## [1.0.0-phase2-stabilization] — July 25, 2026
+
+### Phase 2 Stabilization Accomplishments
+- **Environment Variable Validation (`src/utils/envValidation.ts`):**
+  - Implemented client startup validation checking `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_API_URL`.
+  - Added clean warning logs and automated dynamic backend config fallback.
+- **Unsafe Array & Crash Protection (`src/utils/arrayUtils.ts`):**
+  - Integrated `ensureArray()` and `safeMap()` helpers across components to eliminate `s.map is not a function` runtime exceptions.
+- **Error Boundary Enhancements (`src/components/ErrorBoundary.tsx`):**
+  - Configured error boundary with unique correlation IDs (`ERR-xxxxxx`), log tracebacks, and recovery action buttons ("Retry", "Return Home", "Sign Out").
+- **Layout Overflow & Persistent Header Offset (`src/index.css`):**
+  - Verified total shell header height (`64px`) and layout container scrolling (`overflow-y: auto`, `min-height: 100vh`) to prevent top navigation content clipping.
+- **Production Build Verification (`npm run build`):**
+  - Production bundle generated cleanly via Vite/Rolldown (`1,890 modules transformed` into `dist/assets/index-BAdKmoW0.js`).
+- **TypeScript Type Safety (`npm run tsc --noEmit`):**
+  - Passed clean TypeScript compiler checks with **0 errors**.
+- **Backend API & Dev Server Execution:**
+  - Started backend API server (`server.ts`) on port 3001 and Vite dev server on port 3000.
+  - Resolved route 52 syntax error in `server.ts`.
+- **Browser Smoke Tests:**
+  - Executed automated browser subagent smoke tests verifying route loading and initial state initialization.
+
+---
+
 ## [1.0.0-hardening] — July 25, 2026
 
 ### Added
@@ -26,12 +50,6 @@ All notable changes made during the **Munevo Platform Hardening and Functionalit
   - Added `POST /api/workflow/311/:id/verify` (Step 6 Supervisor Quality Verification & Resolution).
 - **Phase 9 Program Deliverables:**
   - Created `DATABASE_SCHEMA.md`, `AUTH_AND_IDENTITY.md`, `RBAC_MATRIX.md`, `WORKSPACE_CATALOG.md`, `API_INVENTORY.md`, `TEST_PLAN.md`, `RELEASE_CHECKLIST.md`, `SECURITY_NOTES.md`, and `CHANGELOG.md`.
-
-### Fixed & Hardened
-- **Error Boundaries:** Refined `ErrorBoundary.tsx` to log technical correlation IDs and present clean recovery actions ("Retry", "Return Home", "Sign Out").
-- **Unsafe Array Handling:** Guaranteed all component API responses use `ensureArray()` to prevent `s.map is not a function` runtime exceptions.
-- **SSRF & Camera Proxy Security:** Enforced domain allowlist and private IP range blocking in `/api/cameras/:id/media`.
-- **Git Branching:** Executed all work cleanly on dedicated branch `platform-hardening`.
 
 ---
 *End of CHANGELOG.md*

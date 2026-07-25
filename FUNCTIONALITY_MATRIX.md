@@ -1,8 +1,9 @@
 # Munevo Government Cloud — Functionality & Feature Matrix
 
-**Document Version:** 1.0.0  
-**Audit Date:** July 25, 2026  
-**Git Branch:** `platform-hardening`
+**Document Version:** 1.1.0  
+**Date:** July 25, 2026  
+**Git Branch:** `platform-hardening`  
+**Phase Status:** Phase 2 Application Stabilization Completed
 
 ---
 
@@ -19,11 +20,16 @@
 
 ## Master Feature Matrix
 
-| Feature / Workspace | Category / Sub-Feature | Status | Implementation Details & Backend Route |
+| Feature / Workspace | Category / Sub-Feature | Status | Implementation Details & Phase 2 Stabilization |
 | :--- | :--- | :--- | :--- |
+| **Platform Environment** | Environment Key Validation | ⭐ PRODUCTION READY | `envValidation.ts` startup validation & dynamic backend fallback |
+| | Unsafe Array Protection | ⭐ PRODUCTION READY | `arrayUtils.ts` (`ensureArray`, `safeMap`) prevents `s.map` crashes |
+| | Error Boundary & Recovery | ⭐ PRODUCTION READY | `ErrorBoundary.tsx` correlation ID logging, retry, home, signout |
+| | Layout & Overflow Scrolling | ⭐ PRODUCTION READY | Fixed `main` top header padding offset & document body scroll container |
+| | Production Bundle Build | ⭐ PRODUCTION READY | Minified production build verified in `dist/` (`vite build` clean) |
 | **Authentication & Identity** | Email & Password Sign-In | 🔵 BACKEND CONNECTED | Supabase Auth API (`supabaseClient.ts`) + Prisma Profile lookup |
-| | Forgot Password & Email Recovery | 🟠 PARTIALLY FUNCTIONAL | Supabase auth trigger configured; needs complete reset form UI |
-| | Entra ID / SAML SSO | 🟡 UI ONLY | Toggle controls in Identity Console; requires OAuth callback handler |
+| | Forgot Password & Email Recovery | 🟠 PARTIALLY FUNCTIONAL | Supabase auth trigger configured; backend reset endpoints ready |
+| | Entra ID / SAML SSO | 🟡 UI ONLY | OAuth login helper ready; full callback handler in Phase 3 |
 | | Workstation Session Lock | 🔵 BACKEND CONNECTED | Auto lock on idle, PIN reauth, badge tap reauth UI |
 | | Session Inactivity Timeout | 🔵 BACKEND CONNECTED | Configurable timeout, 60s warning countdown, multi-tab sync |
 | | Audit Security Ledger | 🟢 TESTED | `recordAudit()` logs login, logout, failed access, role changes |
