@@ -18,7 +18,8 @@ import {
   EyeOff,
   ShieldCheck,
   Key,
-  ArrowLeft
+  ArrowLeft,
+  UserCheck
 } from 'lucide-react';
 import { supabase, hasRealSupabase } from '../supabaseClient';
 import { Logo } from './Logo';
@@ -61,12 +62,20 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
 
   // Staff Login & Authentication Strengthening States
   const [showLoginForm, setShowLoginForm] = useState(false);
-  const [authView, setAuthView] = useState<'signin' | 'forgot' | 'reset-complete'>('signin');
+  const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot' | 'reset-complete'>('signin');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+
+  // Signup States
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupFirstName, setSignupFirstName] = useState('');
+  const [signupLastName, setSignupLastName] = useState('');
+  const [signupSubmitted, setSignupSubmitted] = useState(false);
 
   // Forgot Password States
   const [forgotEmail, setForgotEmail] = useState('');
@@ -80,6 +89,7 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
   const handleStaffLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
+    setUnconfirmedEmail(null);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
@@ -88,6 +98,9 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
 
       if (error) {
         addNotification(`Auth Error: ${error.message}`);
+        if (error.message.toLowerCase().includes('confirm') || error.message.toLowerCase().includes('not confirmed')) {
+          setUnconfirmedEmail(loginEmail);
+        }
         // Check if user is logging in with global admin email and keys are dummy
         if (!hasRealSupabase && loginEmail === 'global_admin@munevo.gov') {
           addNotification('Local Dev Sync: Real credentials registry match simulated bypass.');
@@ -102,6 +115,12 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
         }
       } else if (data.user) {
         addNotification('Authentication Successful. Resolving registry record...');
+        fetch(`${API_URL}/api/audit-logs/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventType: 'USER_SIGN_IN', userEmail: data.user.email, userId: data.user.id, provider: 'SupabaseAuth' })
+        }).catch(() => {});
+
         const res = await fetch(`${API_URL}/api/profiles/me`, {
           headers: {
             'x-user-id': data.user.id,
@@ -119,6 +138,68 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
     } catch (err: any) {
       console.error(err);
       addNotification(`API Error: ${err.message || 'Failed connecting to database registry auth.'}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (signupPassword.length < 12) {
+      addNotification('Password must be at least 12 characters in accordance with Munevo Security Policy.');
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: signupEmail,
+        password: signupPassword,
+        options: {
+          data: {
+            first_name: signupFirstName,
+            last_name: signupLastName
+          }
+        }
+      });
+
+      if (error) {
+        addNotification(`Signup Error: ${error.message}`);
+      } else {
+        setSignupSubmitted(true);
+        addNotification('Registration request submitted. Please check your email to confirm your account.');
+        fetch(`${API_URL}/api/audit-logs/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventType: 'EMAIL_CONFIRMATION_SENT', userEmail: signupEmail, provider: 'SupabaseAuth' })
+        }).catch(() => {});
+      }
+    } catch (err: any) {
+      addNotification(`Signup Exception: ${err.message}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async (targetEmail: string) => {
+    setAuthLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: targetEmail
+      });
+
+      if (error) {
+        addNotification(`Resend Error: ${error.message}`);
+      } else {
+        addNotification(`Confirmation email resent to ${targetEmail}. Please check your inbox.`);
+        fetch(`${API_URL}/api/audit-logs/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventType: 'EMAIL_CONFIRMATION_SENT', userEmail: targetEmail, provider: 'SupabaseAuth' })
+        }).catch(() => {});
+      }
+    } catch (err: any) {
+      addNotification(`Resend Exception: ${err.message}`);
     } finally {
       setAuthLoading(false);
     }
@@ -1097,6 +1178,21 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
                 </label>
               </div>
 
+              {/* Unconfirmed Email Notice Banner */}
+              {unconfirmedEmail && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', padding: '12px 14px', fontSize: '0.78rem', color: '#fca5a5', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div><strong>Account Unconfirmed:</strong> Your email address ({unconfirmedEmail}) has not been confirmed yet.</div>
+                  <button
+                    type="button"
+                    onClick={() => handleResendConfirmation(unconfirmedEmail)}
+                    disabled={authLoading}
+                    style={{ background: '#ef4444', color: '#fff', border: 0, padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-start' }}
+                  >
+                    {authLoading ? 'Sending...' : 'Resend Confirmation Email'}
+                  </button>
+                </div>
+              )}
+
               {/* Local Dev Warning Banner */}
               {!hasRealSupabase && (
                 <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '10.5px', color: 'var(--warning-text)', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: 1.4 }}>
@@ -1129,6 +1225,17 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
                 </button>
               </div>
 
+              <div style={{ textAlign: 'center', paddingTop: '8px', fontSize: '0.78rem', color: '#9AA3B2' }}>
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setAuthView('signup')}
+                  style={{ background: 'none', border: 0, color: '#3b82f6', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Register / Sign Up
+                </button>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '0.72rem', color: '#9AA3B2', borderTop: '1px solid #2A2E37', paddingTop: '12px' }}>
                 <span style={{ cursor: 'pointer' }}>Security & Audit Policy</span>
                 <span>•</span>
@@ -1136,6 +1243,124 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({
                 <span>•</span>
                 <span style={{ cursor: 'pointer' }}>Help Desk</span>
               </div>
+            </form>
+          )}
+
+          {/* VIEW A.5: Sign Up Form */}
+          {authView === 'signup' && (
+            <form 
+              onSubmit={handleSignupSubmit} 
+              style={{ background: '#12141c', border: '1px solid #2A2E37', borderRadius: '20px', padding: '36px', width: '100%', maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 25px 60px rgba(0,0,0,0.8)' }}
+            >
+              <div style={{ textAlign: 'center', marginBottom: '4px' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <Logo variant="master" size={36} wordmarkSize="1.5rem" />
+                </div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#fff', fontFamily: '"Montserrat", sans-serif' }}>
+                  Create Munevo Account
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#9AA3B2' }}>
+                  Register your municipal or organizational user credentials.
+                </p>
+              </div>
+
+              {signupSubmitted ? (
+                <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', padding: '20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                  <CheckCircle2 size={36} style={{ color: '#10b981' }} />
+                  <div style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 700 }}>
+                    Confirmation Link Sent!
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: '#9AA3B2', margin: 0, lineHeight: 1.5 }}>
+                    We sent a confirmation email to <strong>{signupEmail}</strong>. Click the link in your email to activate your Munevo account.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthView('signin');
+                      setSignupSubmitted(false);
+                    }}
+                    style={{ background: '#3b82f6', color: '#fff', border: 0, padding: '10px 24px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', marginTop: '6px' }}
+                  >
+                    Proceed to Sign In
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: '#9AA3B2', marginBottom: '6px', fontWeight: 600 }}>First Name</label>
+                      <input 
+                        type="text" 
+                        className="ai-input" 
+                        style={{ width: '100%', height: '40px' }}
+                        value={signupFirstName} 
+                        onChange={e => setSignupFirstName(e.target.value)} 
+                        placeholder="Marcus" 
+                        required 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: '#9AA3B2', marginBottom: '6px', fontWeight: 600 }}>Last Name</label>
+                      <input 
+                        type="text" 
+                        className="ai-input" 
+                        style={{ width: '100%', height: '40px' }}
+                        value={signupLastName} 
+                        onChange={e => setSignupLastName(e.target.value)} 
+                        placeholder="Miller" 
+                        required 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#9AA3B2', marginBottom: '6px', fontWeight: 600 }}>Work Email Address</label>
+                    <input 
+                      type="email" 
+                      autoComplete="email"
+                      className="ai-input" 
+                      style={{ width: '100%', height: '40px' }}
+                      value={signupEmail} 
+                      onChange={e => setSignupEmail(e.target.value)} 
+                      placeholder="e.g. m.miller@newark.gov" 
+                      required 
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#9AA3B2', marginBottom: '6px', fontWeight: 600 }}>Password (min. 12 chars)</label>
+                    <input 
+                      type="password" 
+                      autoComplete="new-password"
+                      className="ai-input" 
+                      style={{ width: '100%', height: '40px' }}
+                      value={signupPassword} 
+                      onChange={e => setSignupPassword(e.target.value)} 
+                      placeholder="••••••••••••" 
+                      required 
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setAuthView('signin')} 
+                      style={{ flex: 1, height: '42px', background: 'rgba(255,255,255,0.02)', border: '1px solid #2A2E37', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontFamily: '"Montserrat", sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    >
+                      <ArrowLeft size={14} />
+                      <span>Sign In</span>
+                    </button>
+                    <button 
+                      type="submit" 
+                      disabled={authLoading}
+                      style={{ flex: 2, height: '42px', background: '#10b981', border: 0, color: '#fff', borderRadius: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', fontFamily: '"Montserrat", sans-serif' }}
+                    >
+                      {authLoading ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={15} />}
+                      <span>{authLoading ? 'Creating...' : 'Create Account'}</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </form>
           )}
 

@@ -1616,6 +1616,38 @@ app.get('/api/auth-config', async (req, res) => {
   }
 });
 
+// 29.5 POST /api/auth/entra/login: Initiate Microsoft Entra ID SSO Flow & Boundary Check
+app.post('/api/auth/entra/login', async (req, res) => {
+  let orgId = (req.headers['x-organization-id'] || req.body?.organizationId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    await recordAudit(orgId, null, 'entra-sso-user@munevo.gov', 'MICROSOFT_SIGN_IN_INITIATED', 'IdentitySession', 'MicrosoftEntraID');
+
+    const tenantId = process.env.MICROSOFT_TENANT_ID;
+    const clientId = process.env.MICROSOFT_CLIENT_ID;
+
+    if (!tenantId || !clientId || clientId === '00000000-0000-0000-0000-000000000000') {
+      return res.json({
+        status: 'configuration_required',
+        configured: false,
+        message: 'Microsoft Entra ID integration is at configuration boundary. Azure App Registration credentials required.',
+        requiresEnv: ['MICROSOFT_TENANT_ID', 'MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET']
+      });
+    }
+
+    const redirectUri = encodeURIComponent(`${req.protocol}://${req.get('host')}/auth/v1/callback`);
+    const authorizeUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&response_mode=query&scope=openid%20profile%20email`;
+
+    res.json({
+      status: 'redirect',
+      configured: true,
+      authorizeUrl
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 30. POST /api/audit-logs/auth: Record authentication security audit events
 app.post('/api/audit-logs/auth', async (req, res) => {
   const { eventType, userEmail, provider, result, metadata } = req.body;
@@ -2022,9 +2054,6 @@ app.post('/api/invites/:id/action', async (req, res) => {
         data: { status: 'CANCELLED', cancelledAt: new Date() }
       });
       await recordAudit(orgId, null, invite.normalizedEmail, 'INVITE_CANCELLED', 'Invitation', id);
-      return res.json({ status: 'cancelled', message: 'Invitation cancelled.', invitation: updated });
-    }
-
       return res.json({ status: 'cancelled', message: 'Invitation cancelled.', invitation: updated });
     }
 
@@ -2472,7 +2501,7 @@ app.post('/api/cameras/:id/observations', async (req, res) => {
       id: `OBS-${Math.floor(1000 + Math.random() * 9000)}`,
       cameraId: id,
       cameraName: camera?.name || 'Public Camera',
-      category: category || routing.category || 'General Incident',
+      category: category || (routing as any).category || 'General Incident',
       severity: routing.riskLevel || severity || 'LOW',
       notes: notes || 'Operator manual observation logged from live camera wall feed.',
       confidence: 100.0,

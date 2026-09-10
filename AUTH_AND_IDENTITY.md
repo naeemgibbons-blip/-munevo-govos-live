@@ -63,7 +63,7 @@ Munevo Government Cloud leverages a hybrid identity model connecting **Supabase 
 
 ## 3. Security Audit Logging
 
-All 12 security event types are logged to the `AuditLog` table:
+All 18 security-sensitive event types are logged to the `AuditLog` table:
 
 | Security Action Event | Endpoint / Trigger | Audit Details Logged |
 | :--- | :--- | :--- |
@@ -72,14 +72,19 @@ All 12 security event types are logged to the `AuditLog` table:
 | `FAILED_LOGIN` | `/api/audit-logs/auth` | Email, IP, provider |
 | `PASSWORD_RESET_REQUESTED` | `POST /api/auth/reset-password` | Email, token hash |
 | `PASSWORD_RESET_COMPLETED` | `POST /api/auth/confirm-reset` | User ID, email |
+| `EMAIL_CONFIRMATION_SENT` | `/api/audit-logs/auth` | Email, provider |
+| `EMAIL_CONFIRMED` | `/api/audit-logs/auth` | User ID, email |
 | `INVITE_CREATED` | `POST /api/invites` | Inviter ID, target email, role ID, org ID |
 | `INVITATION_ACCEPTED` | `POST /api/invites/accept` | User ID, org ID, membership ID |
 | `INVITE_RESENT` | `POST /api/invites/:id/action` | Invite ID, target email |
+| `INVITE_CANCELLED` | `POST /api/invites/:id/action` | Invite ID, target email |
+| `ORGANIZATION_SWITCHED` | `/api/audit-logs/auth` | User ID, previous org, new org ID |
 | `ROLE_CHANGE` | `PATCH /api/members/:id/assignment` | Target user ID, new role ID, role name |
 | `DEPARTMENT_CHANGE` | `PATCH /api/members/:id/assignment` | Target user ID, department code |
 | `ACCOUNT_DISABLED` | `PATCH /api/profiles/:id/status` | Target user ID, status (`DISABLED`/`SUSPENDED`), reason |
 | `ACCOUNT_REACTIVATED` | `PATCH /api/profiles/:id/status` | Target user ID, status (`ACTIVE`) |
 | `SESSION_TIMEOUT` | `/api/audit-logs/auth` | User ID, workstation IP, timeout timestamp |
+| `UNAUTHORIZED_ACCESS_ATTEMPT` | `validateTenantAccess` middleware | User ID, target org ID, module |
 
 ---
 *End of AUTH_AND_IDENTITY.md*

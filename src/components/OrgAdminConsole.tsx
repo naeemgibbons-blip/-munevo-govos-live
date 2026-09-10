@@ -252,6 +252,27 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
     }
   };
 
+  const handleInviteAction = async (inviteId: string, action: 'RESEND' | 'CANCEL') => {
+    try {
+      const res = await fetch(`${API_URL}/api/invites/${inviteId}/action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-organization-id': orgId
+        },
+        body: JSON.stringify({ action })
+      });
+      if (res.ok) {
+        addNotification(`Invitation ${action.toLowerCase()}ed successfully.`);
+        fetchTenantData();
+      } else {
+        addNotification(`Failed processing ${action.toLowerCase()} action.`);
+      }
+    } catch (err) {
+      addNotification('API error processing invitation action.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full gap-4 text-slate-400 p-24" style={{ height: '70vh' }}>
@@ -466,8 +487,24 @@ export const OrgAdminConsole: React.FC<OrgAdminConsoleProps> = ({
                     Assigned Role: <strong style={{ color: '#10b981' }}>{inv.role?.name || 'Org Admin'}</strong>
                   </div>
                   <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', padding: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', overflowX: 'auto' }}>
-                    Token: {inv.token}
+                    Token: {inv.tokenHash || inv.token}
                   </div>
+                  {inv.status === 'PENDING' && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => handleInviteAction(inv.id, 'CANCEL')}
+                        style={{ padding: '4px 8px', fontSize: '10px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '4px', color: '#fca5a5', cursor: 'pointer' }}
+                      >
+                        Cancel Invite
+                      </button>
+                      <button
+                        onClick={() => handleInviteAction(inv.id, 'RESEND')}
+                        style={{ padding: '4px 8px', fontSize: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '4px', color: '#93c5fd', cursor: 'pointer' }}
+                      >
+                        Resend Invite
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
