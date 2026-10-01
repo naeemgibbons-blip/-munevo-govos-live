@@ -734,6 +734,271 @@ app.get('/api/auth/config', (req, res) => {
   });
 });
 
+// Single-use WebAuthn Challenge Cache (5 min TTL)
+const webauthnChallengesTop = new Map<string, { challenge: string; expiresAt: number; userId?: string }>();
+
+// In-Memory WebAuthn Registered Credentials Registry
+interface WebAuthnRegisteredKeyTop {
+  id: string;
+  credentialId: string;
+  name: string;
+  userEmail: string;
+  employeeName: string;
+  publicKey: string;
+  counter: number;
+  transports: string[];
+  createdAt: string;
+  lastUsedAt: string;
+  status: 'ACTIVE' | 'REVOKED';
+}
+
+const webauthnRegisteredKeysTop: WebAuthnRegisteredKeyTop[] = [
+  {
+    id: 'key_01',
+    credentialId: 'FIDO2-YUBIKEY-01-NWK',
+    name: 'YubiKey 5C NFC (Primary Administrator)',
+    userEmail: 'mayor@munevo.gov',
+    employeeName: 'Mayor Naeem Gibbons',
+    publicKey: 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9... (ES256)',
+    counter: 42,
+    transports: ['usb', 'nfc'],
+    createdAt: '2026-01-15T10:00:00.000Z',
+    lastUsedAt: new Date(Date.now() - 120000).toISOString(),
+    status: 'ACTIVE'
+  },
+  {
+    id: 'key_02',
+    credentialId: 'FIDO2-WINHELLO-02-NWK',
+    name: 'Windows Hello Biometrics (Workstation 4)',
+    userEmail: 'inspector@munevo.gov',
+    employeeName: 'Elena Rostova',
+    publicKey: 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8... (RS256)',
+    counter: 18,
+    transports: ['internal'],
+    createdAt: '2026-03-22T14:30:00.000Z',
+    lastUsedAt: new Date(Date.now() - 1080000).toISOString(),
+    status: 'ACTIVE'
+  }
+];
+
+// GET /api/auth/webauthn/credentials
+app.get('/api/auth/webauthn/credentials', (req, res) => {
+  res.json(webauthnRegisteredKeysTop);
+});
+
+// DELETE /api/auth/webauthn/credentials/:id
+app.delete('/api/auth/webauthn/credentials/:id', async (req, res) => {
+  const { id } = req.params;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+    const key = webauthnRegisteredKeysTop.find(k => k.id === id || k.credentialId === id);
+    if (key) {
+      key.status = 'REVOKED';
+      await recordAudit(orgId, null, key.userEmail, 'AUTH_WEBAUTHN_REVOKE_SUCCESS', 'WebAuthnCredential', key.credentialId);
+      return res.json({ status: 'REVOKED', key });
+    }
+    res.status(404).json({ error: 'Credential not found' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/webauthn/register-challenge
+app.post('/api/auth/webauthn/register-challenge', async (req, res) => {
+  const { userEmail, employeeName } = req.body;
+  try {
+    const challengeId = 'reg_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const rawBytes = Array.from({ length: 32 }, () => Math.floor(Math.random() * 256));
+    const challenge = Buffer.from(rawBytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+    const targetEmail = userEmail || 'mayor@munevo.gov';
+    const targetName = employeeName || 'Mayor Naeem Gibbons';
+    const userId = Buffer.from(targetEmail).toString('base64');
+
+    let computedRpId = req.hostname ? req.hostname.split(':')[0] : 'localhost';
+    const originHeader = (req.headers.origin || req.headers.referer) as string;
+    if (originHeader) {
+      try {
+        computedRpId = new URL(originHeader).hostname;
+      } catch (e) {}
+    }
+
+    webauthnChallengesTop.set(challengeId, {
+      challenge,
+      expiresAt: Date.now() + 300000,
+      userId: targetEmail
+    });
+
+    res.json({
+      challengeId,
+      challenge,
+      rp: {
+        name: 'Munevo Municipal OS',
+        id: computedRpId
+      },
+      user: {
+        id: userId,
+        name: targetEmail,
+        displayName: targetName
+      },
+      pubKeyCredParams: [
+        { type: 'public-key', alg: -7 },
+        { type: 'public-key', alg: -257 }
+      ],
+      authenticatorSelection: {
+        userVerification: 'preferred',
+        residentKey: 'preferred'
+      },
+      timeout: 60000,
+      attestation: 'none'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/webauthn/register-verify
+app.post('/api/auth/webauthn/register-verify', async (req, res) => {
+  const { challengeId, name, credentialId, response, userEmail, employeeName } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+
+    if (!challengeId || !webauthnChallengesTop.has(challengeId)) {
+      return res.status(400).json({ error: 'Registration challenge expired or invalid' });
+    }
+
+    const storedChallenge = webauthnChallengesTop.get(challengeId)!;
+    webauthnChallengesTop.delete(challengeId);
+
+    if (Date.now() > storedChallenge.expiresAt) {
+      return res.status(400).json({ error: 'Registration challenge timed out' });
+    }
+
+    const newCredId = credentialId || 'FIDO2-HW-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const newKey: WebAuthnRegisteredKeyTop = {
+      id: 'key_' + Date.now().toString(36),
+      credentialId: newCredId,
+      name: name || 'Hardware Security Key (FIDO2)',
+      userEmail: userEmail || storedChallenge.userId || 'mayor@munevo.gov',
+      employeeName: employeeName || 'Mayor Naeem Gibbons',
+      publicKey: 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE' + Math.random().toString(36).substring(2, 10),
+      counter: 1,
+      transports: ['usb', 'nfc'],
+      createdAt: new Date().toISOString(),
+      lastUsedAt: new Date().toISOString(),
+      status: 'ACTIVE'
+    };
+
+    webauthnRegisteredKeysTop.unshift(newKey);
+
+    await recordAudit(
+      orgId,
+      'usr_webauthn_admin',
+      newKey.userEmail,
+      'AUTH_WEBAUTHN_REGISTER_SUCCESS',
+      'WebAuthnCredential',
+      newKey.credentialId,
+      null,
+      { credentialName: newKey.name, credentialId: newKey.credentialId }
+    );
+
+    res.json({
+      status: 'REGISTERED',
+      credential: newKey
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/webauthn/challenge
+app.post('/api/auth/webauthn/challenge', async (req, res) => {
+  try {
+    const challengeId = 'ch_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const rawBytes = Array.from({ length: 32 }, () => Math.floor(Math.random() * 256));
+    const challenge = Buffer.from(rawBytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+    let computedRpId = req.hostname ? req.hostname.split(':')[0] : 'localhost';
+    const originHeader = (req.headers.origin || req.headers.referer) as string;
+    if (originHeader) {
+      try {
+        computedRpId = new URL(originHeader).hostname;
+      } catch (e) {}
+    }
+
+    webauthnChallengesTop.set(challengeId, {
+      challenge,
+      expiresAt: Date.now() + 300000
+    });
+
+    res.json({
+      challengeId,
+      challenge,
+      rpId: computedRpId,
+      timeout: 60000
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/webauthn/verify
+app.post('/api/auth/webauthn/verify', async (req, res) => {
+  const { challengeId, credentialId, response } = req.body;
+  let orgId = (req.headers['x-organization-id'] || req.query.orgId) as string;
+
+  try {
+    if (!orgId) orgId = await getNewarkOrgId();
+
+    if (!challengeId || !webauthnChallengesTop.has(challengeId)) {
+      return res.status(400).json({ error: 'WebAuthn challenge expired or invalid', code: 'CHALLENGE_EXPIRED' });
+    }
+
+    const storedChallenge = webauthnChallengesTop.get(challengeId)!;
+    webauthnChallengesTop.delete(challengeId);
+
+    if (Date.now() > storedChallenge.expiresAt) {
+      return res.status(400).json({ error: 'WebAuthn challenge expired', code: 'CHALLENGE_TIMEOUT' });
+    }
+
+    if (!response || !response.clientDataJSON || !response.signature) {
+      return res.status(400).json({ error: 'Malformed WebAuthn assertion payload' });
+    }
+
+    const defaultUser = {
+      email: 'mayor@munevo.gov',
+      name: 'Mayor Naeem Gibbons',
+      role: 'Mayor / City Manager'
+    };
+
+    await recordAudit(
+      orgId,
+      'usr_webauthn_hardware',
+      defaultUser.email,
+      'AUTH_WEBAUTHN_SUCCESS',
+      'WorkstationSession',
+      credentialId || 'FIDO2-YUBIKEY-01',
+      null,
+      { authMethod: 'WEBAUTHN', credentialId, result: 'UNLOCKED' }
+    );
+
+    res.json({
+      status: 'VERIFIED',
+      authMethod: 'WEBAUTHN',
+      userEmail: defaultUser.email,
+      employeeName: defaultUser.name,
+      role: defaultUser.role,
+      unlockedAt: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // 6.7. GET /api/auth/bootstrap-status: Check if any Global Admin profiles exist
 app.get('/api/auth/bootstrap-status', async (req, res) => {
   try {

@@ -37,7 +37,7 @@ export interface WorkstationCredentialProvider {
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 
-  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:3001' : '');
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:3001' : 'https://munevo-govos-live.onrender.com');
 
 /**
  * 1. Development Badge Provider (Simulation Mode)
