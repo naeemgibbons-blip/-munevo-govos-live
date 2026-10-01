@@ -16,6 +16,8 @@ import {
   Server
 } from 'lucide-react';
 
+import { Fido2HardwareTestConsole } from './Fido2HardwareTestConsole';
+
 interface PlatformControlCenterProps {
   currentProfile: any;
   addNotification: (msg: string) => void;
@@ -26,6 +28,7 @@ export const PlatformControlCenter: React.FC<PlatformControlCenterProps> = ({
   addNotification
 }) => {
   const [activeTab, setActiveTab] = useState<string>('health');
+  const [authSubTab, setAuthSubTab] = useState<'fido2' | 'sso'>('fido2');
 
   const navItems = [
     { id: 'health', label: 'Platform Health', icon: Cpu },
@@ -183,18 +186,56 @@ export const PlatformControlCenter: React.FC<PlatformControlCenterProps> = ({
       )}
 
       {activeTab === 'auth-settings' && (
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="card-header">
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-                Enterprise Authentication & Identity Management
-              </h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Configure identity providers, Microsoft Entra SSO, enrollment policies, and password requirements.
-              </p>
-            </div>
-            <span className="badge-status badge-success">Supabase Auth Authoritative</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Subtab navigation selector */}
+          <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+            <button
+              onClick={() => setAuthSubTab('fido2')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: authSubTab === 'fido2' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+                border: authSubTab === 'fido2' ? '1px solid #10b981' : '1px solid transparent',
+                color: authSubTab === 'fido2' ? '#10b981' : 'var(--text-secondary)'
+              }}
+            >
+              🔑 FIDO2 / WebAuthn & Windows Hello
+            </button>
+            <button
+              onClick={() => setAuthSubTab('sso')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: authSubTab === 'sso' ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                border: authSubTab === 'sso' ? '1px solid #3b82f6' : '1px solid transparent',
+                color: authSubTab === 'sso' ? '#3b82f6' : 'var(--text-secondary)'
+              }}
+            >
+              🏢 Enterprise SSO & Enrollment Policies
+            </button>
           </div>
+
+          {authSubTab === 'fido2' ? (
+            <Fido2HardwareTestConsole addNotification={addNotification} />
+          ) : (
+            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="card-header">
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                    Enterprise Authentication & Identity Management
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Configure identity providers, Microsoft Entra SSO, enrollment policies, and password requirements.
+                  </p>
+                </div>
+                <span className="badge-status badge-success">Supabase Auth Authoritative</span>
+              </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
             {/* Identity Providers Configuration */}
@@ -273,6 +314,8 @@ export const PlatformControlCenter: React.FC<PlatformControlCenterProps> = ({
           </div>
         </div>
       )}
+    </div>
+  )}
 
       {/* TAB 8: Badge Credentials Management (NFC/PIV Smart Badges) */}
       {activeTab === 'badge-management' && (

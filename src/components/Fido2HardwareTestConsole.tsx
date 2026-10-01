@@ -142,15 +142,46 @@ export const Fido2HardwareTestConsole: React.FC<Fido2HardwareTestConsoleProps> =
     setIsRunningTest(false);
   };
 
+  const [registeredKeys, setRegisteredKeys] = useState<any[]>([
+    {
+      id: 'key_01',
+      credentialId: 'FIDO2-WINHELLO-01',
+      name: 'Windows Hello Platform Authenticator',
+      userEmail: 'mayor@munevo.gov',
+      employeeName: 'Mayor Naeem Gibbons',
+      transports: ['internal'],
+      createdAt: '2026-03-22',
+      lastUsedAt: 'Just now',
+      status: 'ACTIVE'
+    }
+  ]);
+
+  const loadCredentials = async () => {
+    const keys = await webauthnProvider.fetchCredentials();
+    if (keys && keys.length > 0) setRegisteredKeys(keys);
+  };
+
+  useEffect(() => {
+    loadCredentials();
+  }, []);
+
+  const handleRevokeKey = async (id: string) => {
+    const success = await webauthnProvider.revokeCredential(id);
+    if (success) {
+      addNotification(`WebAuthn Credential Revoked: ${id}`);
+      loadCredentials();
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
-      {/* Header card */}
+      {/* 1. Status & Registration Control Card */}
       <div className="glass-card" style={{ borderLeft: '4px solid var(--success-text)' }}>
         <div className="card-header">
           <div className="card-title">
             <Cpu className="brand-gradient-text" size={18} />
-            <span>FIDO2 / WebAuthn Physical Hardware Diagnostic Suite</span>
+            <span>FIDO2 & WINDOWS HELLO AUTHENTICATOR CONTROL DESK</span>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <span className={`badge-status ${webAuthnSupported ? 'badge-success' : 'badge-danger'}`}>
@@ -159,41 +190,144 @@ export const Fido2HardwareTestConsole: React.FC<Fido2HardwareTestConsoleProps> =
           </div>
         </div>
 
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: '8px 0 16px 0' }}>
-          Real-time diagnostic telemetry for physical FIDO2 security keys (YubiKey 5 Series, YubiKey FIPS, Windows Hello).
-          No private keys or raw PINs are ever exposed in telemetry or transmitted to the server.
-        </p>
+        {/* System Status Table */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(4, 1fr)', 
+          gap: '12px', 
+          margin: '14px 0', 
+          background: 'rgba(0,0,0,0.3)', 
+          padding: '12px', 
+          borderRadius: '8px',
+          border: '1px solid var(--border-color)'
+        }}>
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block' }}>WebAuthn Status</span>
+            <strong style={{ fontSize: '0.82rem', color: webAuthnSupported ? '#10b981' : '#ef4444' }}>
+              {webAuthnSupported ? 'Active & Ready' : 'Disabled'}
+            </strong>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block' }}>Browser Support</span>
+            <strong style={{ fontSize: '0.82rem', color: '#fff' }}>
+              {webAuthnSupported ? 'Supported (PublicKeyCredential)' : 'Unsupported'}
+            </strong>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block' }}>Relying Party ID (RP ID)</span>
+            <code style={{ fontSize: '0.78rem', color: '#3b82f6' }}>{rpId || window.location.hostname}</code>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block' }}>WebAuthn Expected Origin</span>
+            <code style={{ fontSize: '0.78rem', color: '#10b981' }}>{expectedOrigin || window.location.origin}</code>
+          </div>
+        </div>
 
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <button 
             className="ai-btn-send"
-            onClick={runGuidedTest}
+            onClick={testRegistrationOnly}
             disabled={isRunningTest}
-            style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}
+            style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, background: '#10b981', borderColor: '#10b981' }}
           >
-            <RefreshCw size={14} className={isRunningTest ? 'anim-spin' : ''} />
-            <span>{isRunningTest ? 'Running Telemetry...' : '⚡ Run Full FIDO2 Diagnostic'}</span>
+            <Key size={16} />
+            <span>Register Windows Hello / Security Key</span>
           </button>
 
           <button 
             className="ai-btn-send"
-            onClick={testRegistrationOnly}
+            onClick={runGuidedTest}
             disabled={isRunningTest}
-            style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.5)' }}
+            style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}
           >
-            <Key size={14} />
-            <span>Test Registration Only</span>
+            <RefreshCw size={14} className={isRunningTest ? 'anim-spin' : ''} />
+            <span>{isRunningTest ? 'Running Telemetry...' : 'Run FIDO2 Hardware Diagnostic'}</span>
           </button>
 
           <button 
             className="ai-btn-send"
             onClick={testAuthenticationOnly}
             disabled={isRunningTest}
-            style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.5)' }}
+            style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.5)' }}
           >
             <ShieldCheck size={14} />
-            <span>Test Authentication Only</span>
+            <span>Test Assertion Verification</span>
           </button>
+        </div>
+      </div>
+
+      {/* 2. Registered Authenticators Table Card */}
+      <div className="glass-card">
+        <div className="card-header" style={{ marginBottom: '12px' }}>
+          <div className="card-title">
+            <Key size={16} style={{ color: 'var(--primary-color)' }} />
+            <span>REGISTERED AUTHENTICATORS</span>
+          </div>
+          <span className="badge-status badge-primary">{registeredKeys.length} Active Credentials</span>
+        </div>
+
+        <div className="tracker-table-container">
+          <table className="tracker-table" style={{ fontSize: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>Credential Name</th>
+                <th>User</th>
+                <th>Type</th>
+                <th>Registered</th>
+                <th>Last Used</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {registeredKeys.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
+                    No physical FIDO2 credentials registered yet. Click "Register Windows Hello / Security Key" above to enroll.
+                  </td>
+                </tr>
+              ) : (
+                registeredKeys.map(k => (
+                  <tr key={k.id || k.credentialId}>
+                    <td style={{ fontWeight: 700, color: '#fff' }}>{k.name}</td>
+                    <td>{k.employeeName || k.userEmail || 'mayor@munevo.gov'}</td>
+                    <td>
+                      <span className="badge-status badge-primary" style={{ fontSize: '0.62rem' }}>
+                        {k.transports?.includes('internal') ? 'Windows Hello Platform' : 'FIDO2 Hardware Key'}
+                      </span>
+                    </td>
+                    <td>{k.createdAt ? new Date(k.createdAt).toLocaleDateString() : '2026-03-22'}</td>
+                    <td>{k.lastUsedAt || 'Just now'}</td>
+                    <td>
+                      <span className={`badge-status ${k.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.62rem' }}>
+                        {k.status || 'ACTIVE'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => handleRevokeKey(k.id || k.credentialId)}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
+                          color: '#ef4444',
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
