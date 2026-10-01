@@ -1813,6 +1813,14 @@ app.post('/api/auth/webauthn/register-challenge', async (req, res) => {
     // User ID Buffer as base64
     const userId = Buffer.from(targetEmail).toString('base64');
 
+    let computedRpId = req.hostname ? req.hostname.split(':')[0] : 'localhost';
+    const originHeader = (req.headers.origin || req.headers.referer) as string;
+    if (originHeader) {
+      try {
+        computedRpId = new URL(originHeader).hostname;
+      } catch (e) {}
+    }
+
     webauthnChallenges.set(challengeId, {
       challenge,
       expiresAt: Date.now() + 300000,
@@ -1824,7 +1832,7 @@ app.post('/api/auth/webauthn/register-challenge', async (req, res) => {
       challenge,
       rp: {
         name: 'Munevo Municipal OS',
-        id: req.hostname || 'localhost'
+        id: computedRpId
       },
       user: {
         id: userId,
@@ -1918,6 +1926,14 @@ app.post('/api/auth/webauthn/challenge', async (req, res) => {
     const rawBytes = Array.from({ length: 32 }, () => Math.floor(Math.random() * 256));
     const challenge = Buffer.from(rawBytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
+    let computedRpId = req.hostname ? req.hostname.split(':')[0] : 'localhost';
+    const originHeader = (req.headers.origin || req.headers.referer) as string;
+    if (originHeader) {
+      try {
+        computedRpId = new URL(originHeader).hostname;
+      } catch (e) {}
+    }
+
     webauthnChallenges.set(challengeId, {
       challenge,
       expiresAt: Date.now() + 300000 // 5 minutes
@@ -1926,7 +1942,7 @@ app.post('/api/auth/webauthn/challenge', async (req, res) => {
     res.json({
       challengeId,
       challenge,
-      rpId: req.hostname || 'localhost',
+      rpId: computedRpId,
       timeout: 60000
     });
   } catch (err: any) {

@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "ts-node server.ts",
     "dev": "concurrently \"ts-node server.ts\" \"vite\"",
     "build": "prisma generate && tsc -b && vite build",
     "postinstall": "prisma generate",
