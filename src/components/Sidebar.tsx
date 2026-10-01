@@ -504,10 +504,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ))}
         </div>
 
-        {/* Platform Control Center */}
-        {currentProfile?.isGlobalAdmin && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: 'auto' }}>
-            <div className="menu-group-label">Administration</div>
+        {/* Munevo Admin Section */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: 'auto' }}>
+          <div className="menu-group-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981' }}>
+            <ShieldCheck size={12} />
+            <span>Munevo Admin</span>
+          </div>
+          <div
+            className={`menu-item ${activeModule === 'identity-security' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveProduct('core');
+              setActiveModule('identity-security');
+            }}
+          >
+            <ShieldCheck size={16} />
+            <span>Identity & Access Console</span>
+          </div>
+          {currentProfile?.isGlobalAdmin && (
             <div
               className={`menu-item ${activeModule === 'platform-control' ? 'active' : ''}`}
               onClick={() => {
@@ -518,8 +531,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <LayoutGrid size={16} />
               <span>Platform Control Center</span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="sidebar-footer">

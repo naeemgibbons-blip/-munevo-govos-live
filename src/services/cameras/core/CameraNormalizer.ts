@@ -66,8 +66,8 @@ export class CameraNormalizer {
     };
 
     if (!validateNormalizedCamera(camera)) {
-      console.warn(`[CameraNormalizer] Camera ${camera.id} failed validation checks, defaulting status to ERROR.`);
-      camera.status = 'ERROR';
+      console.warn(`[CameraNormalizer] Camera ${(camera as any).id} failed validation checks, defaulting status to ERROR.`);
+      (camera as any).status = 'ERROR';
     }
 
     return camera;

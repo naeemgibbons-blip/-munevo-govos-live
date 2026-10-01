@@ -1,5 +1,5 @@
-import { CameraProxySecurity } from '../security/CameraProxySecurity.js';
-import type { NormalizedCamera, CameraPermissions } from '../core/CameraTypes.js';
+import { CameraProxySecurity } from '../security/CameraProxySecurity.ts';
+import type { NormalizedCamera, CameraPermissions } from '../core/CameraTypes.ts';
 
 export type OptInLifecycleStatus = 
   | 'PENDING_VERIFICATION'

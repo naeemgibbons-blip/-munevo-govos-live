@@ -1,4 +1,4 @@
-import type { NormalizedCamera } from '../core/CameraTypes.js';
+import type { NormalizedCamera } from '../core/CameraTypes.ts';
 
 export type RiskLevel = 'LOW' | 'HIGH' | 'CRITICAL';
 

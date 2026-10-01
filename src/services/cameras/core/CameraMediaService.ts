@@ -1,5 +1,5 @@
-import type { NormalizedCamera, CameraMediaResult, CameraMediaType } from './CameraTypes.js';
-import { CameraConnectorRegistry } from './CameraConnectorRegistry.js';
+import type { NormalizedCamera, CameraMediaResult, CameraMediaType } from './CameraTypes.ts';
+import { CameraConnectorRegistry } from './CameraConnectorRegistry.ts';
 
 export class CameraMediaService {
   private static instance: CameraMediaService;

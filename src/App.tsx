@@ -28,6 +28,8 @@ import { FloatingDock } from './components/FloatingDock';
 import { MunevoSafeConsole } from './components/MunevoSafeConsole';
 import { SentinelAiConsole } from './components/SentinelAiConsole';
 import { supabase, updateSupabaseConfig } from './supabaseClient';
+import { verifyBadgeUnlock } from './services/badgeAuthService';
+import { credentialManager, WorkstationGuardState, AuthMethodAssurance } from './services/credentialProviders';
 import { 
   USER_ROLES, 
   PROPERTIES, 
@@ -96,6 +98,9 @@ function App() {
 
   // Workstation Session Security & Inactivity States
   const [isSessionLocked, setIsSessionLocked] = useState(false);
+  const [guardState, setGuardState] = useState<WorkstationGuardState>('LOCKED');
+  const [activeAuthAssurance, setActiveAuthAssurance] = useState<AuthMethodAssurance>('PASSWORD');
+  const [badgeSimulationEnabled, setBadgeSimulationEnabled] = useState(false);
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
   const [warningCountdown, setWarningCountdown] = useState(60);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -139,6 +144,7 @@ function App() {
         if (configRes.ok) {
           const config = await configRes.json();
           updateSupabaseConfig(config.supabaseUrl, config.supabaseAnonKey);
+          setBadgeSimulationEnabled(Boolean(config.badgeSimulationEnabled));
         }
       } catch (err) {
         console.error('Failed loading dynamic supabase credentials:', err);
@@ -306,28 +312,77 @@ function App() {
     addNotification('Workstation session locked securely.');
   };
 
-  // Badge Tap Reauthentication Handler
-  const handleBadgeUnlock = async (badgeIdToTest?: string) => {
-    const targetId = badgeIdToTest || lockBadgeInput || 'BDG-NWK-0092';
-    try {
-      const res = await fetch(`${API_URL}/api/auth/badge-unlock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ badgeId: targetId })
-      });
-      if (res.ok) {
-        setIsSessionLocked(false);
-        setShowInactivityWarning(false);
-        setLockBadgeInput('');
-        setLockPinInput('');
-        localStorage.setItem('munevo_session_action', 'UNLOCK');
-        addNotification(`Workstation unlocked via NFC Badge Tap (${targetId}). Welcome back!`);
-      } else {
-        addNotification('Badge Unlock Denied: Invalid or suspended credential UID.');
-      }
-    } catch (err) {
+  // Secure User Context Switching Handler
+  const handleUserSwitchContext = (email?: string, name?: string, roleStr?: string) => {
+    if (!email) return;
+    const currentUserEmail = currentRole.name === 'Mayor / City Manager' ? 'mayor@munevo.gov' : 'inspector@munevo.gov';
+    if (email.toLowerCase() !== currentUserEmail.toLowerCase()) {
+      const isMayor = (roleStr || '').toLowerCase().includes('mayor') || email.includes('mayor');
+      const isInspector = (roleStr || '').toLowerCase().includes('inspector') || email.includes('inspector');
+      
+      let nextRole = USER_ROLES.mayor;
+      if (isInspector) nextRole = USER_ROLES.inspector;
+      else if (!isMayor) nextRole = USER_ROLES.resident;
+
+      setCurrentRole(nextRole);
+      setChartTabs([]); // Terminate previous user tab memory
+      setActiveChartTabId(null);
+      addNotification(`Switched Active User: Isolated previous context and loaded ${name || email} session (${nextRole.name}).`);
+    }
+  };
+
+  // WebAuthn FIDO2 Cryptographic Hardware Unlock Handler
+  const handleWebAuthnUnlock = async () => {
+    setGuardState('AUTHENTICATING');
+    const provider = credentialManager.getProvider('webauthn-fido2-provider');
+    if (!provider) return;
+
+    const res = await provider.authenticate();
+    if (res.success) {
+      handleUserSwitchContext(res.userEmail, res.employeeName, res.role);
       setIsSessionLocked(false);
-      addNotification('Simulated Badge Unlock successful!');
+      setShowInactivityWarning(false);
+      setGuardState('VERIFIED');
+      setActiveAuthAssurance('WEBAUTHN');
+      localStorage.setItem('munevo_session_action', 'UNLOCK');
+      addNotification(`Cryptographic WebAuthn Assertion Verified! Welcome back ${res.employeeName || 'Officer'}.`);
+    } else {
+      setGuardState(res.guardState || 'ACCESS_DENIED');
+      addNotification(`WebAuthn Authentication: ${res.error || 'Signature verification failed.'}`);
+    }
+  };
+
+  // Development Badge Unlock Handler (Gated behind MUNEVO_ENABLE_BADGE_SIMULATION)
+  const handleBadgeUnlock = async (badgeIdToTest?: string) => {
+    if (!badgeSimulationEnabled) {
+      setGuardState('ACCESS_DENIED');
+      addNotification('Simulated Badge Unlock Denied: Development simulation is disabled in production environments.');
+      return;
+    }
+
+    setGuardState('AUTHENTICATING');
+    const provider = credentialManager.getProvider('dev-badge-provider');
+    if (!provider) return;
+
+    const targetId = badgeIdToTest || lockBadgeInput || 'BDG-NWK-0092';
+    const res = await provider.authenticate({ badgeId: targetId, pin: lockPinInput });
+
+    if (res.success) {
+      handleUserSwitchContext(res.userEmail, res.employeeName, res.role);
+      setIsSessionLocked(false);
+      setShowInactivityWarning(false);
+      setGuardState('VERIFIED');
+      setActiveAuthAssurance('DEV_SIMULATION');
+      setLockBadgeInput('');
+      setLockPinInput('');
+      localStorage.setItem('munevo_session_action', 'UNLOCK');
+      addNotification(`[DEV SIMULATION] Workstation unlocked via Badge Tap (${targetId}). Welcome back ${res.employeeName}!`);
+    } else if (res.pinRequired) {
+      setGuardState('PIN_REQUIRED_BY_CREDENTIAL_PROVIDER');
+      addNotification(`PIN Required: PIV Credential (${targetId}) requires 4-digit security PIN.`);
+    } else {
+      setGuardState('ACCESS_DENIED');
+      addNotification(`Badge Unlock Denied: ${res.error}`);
     }
   };
 
@@ -336,6 +391,8 @@ function App() {
     e.preventDefault();
     setIsSessionLocked(false);
     setShowInactivityWarning(false);
+    setGuardState('VERIFIED');
+    setActiveAuthAssurance('PASSWORD');
     setLockPinInput('');
     localStorage.setItem('munevo_session_action', 'UNLOCK');
     addNotification('Workstation session unlocked via password reauthentication.');
@@ -1128,7 +1185,9 @@ function App() {
                     {/* Navigation Items */}
                     <button
                       onClick={() => {
-                        handleSelectWorkspace('platform');
+                        setActiveProduct('core');
+                        setActiveModule('identity-security');
+                        setViewMode('module');
                         setIsProfileMenuOpen(false);
                       }}
                       style={{ background: 'transparent', border: 0, color: '#fff', padding: '8px 10px', borderRadius: '6px', textAlign: 'left', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -1141,7 +1200,9 @@ function App() {
 
                     <button
                       onClick={() => {
-                        handleSelectWorkspace('platform');
+                        setActiveProduct('core');
+                        setActiveModule('identity-security');
+                        setViewMode('module');
                         setIsProfileMenuOpen(false);
                       }}
                       style={{ background: 'transparent', border: 0, color: '#fff', padding: '8px 10px', borderRadius: '6px', textAlign: 'left', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -1149,7 +1210,7 @@ function App() {
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <ShieldCheck size={14} style={{ color: '#10b981' }} />
-                      <span>Badge Credentials & NFC Reader</span>
+                      <span>FIDO2 Security Keys & IAM</span>
                     </button>
 
                     <button
@@ -1670,22 +1731,51 @@ function App() {
               </div>
             </div>
 
-            {/* Tap Badge to Unlock Card Reader Animation */}
-            <div style={{ width: '100%', background: 'rgba(59, 130, 246, 0.05)', border: '1px dashed rgba(59, 130, 246, 0.3)', borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+            {/* Cryptographic & Simulation Credential Providers Card */}
+            <div style={{ width: '100%', background: 'rgba(59, 130, 246, 0.05)', border: `1px dashed ${badgeSimulationEnabled ? '#f59e0b' : '#3b82f6'}`, borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              
+              {/* Simulation Mode Indicator Header */}
+              {badgeSimulationEnabled ? (
+                <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', color: '#f59e0b', padding: '4px 10px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.05em' }}>
+                  DEVELOPMENT BADGE SIMULATION (NON-PRODUCTION)
+                </div>
+              ) : (
+                <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#10b981', padding: '4px 10px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.05em' }}>
+                  PRODUCTION CRYPTOGRAPHIC AUTHENTICATION REQUIRED
+                </div>
+              )}
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6', fontSize: '0.82rem', fontWeight: 700 }}>
                 <ShieldCheck size={18} />
-                <span>NFC / PIV Smart Badge Reader Ready</span>
+                <span>Workstation Security Provider Ready</span>
               </div>
               <p style={{ fontSize: '0.72rem', color: '#9AA3B2', margin: 0 }}>
-                Tap your employee badge on the workstation reader to reauthenticate.
+                {badgeSimulationEnabled 
+                  ? 'Dev simulation active. Insert FIDO2 WebAuthn token or use simulated tap.'
+                  : 'Insert physical YubiKey / FIDO2 security token or Entra PIV smart card.'}
               </p>
-              <button
-                onClick={() => handleBadgeUnlock('BDG-NWK-0092')}
-                style={{ background: '#3b82f6', color: '#fff', border: 0, padding: '8px 18px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Key size={14} />
-                <span>Simulate Physical Badge Tap (BDG-NWK-0092)</span>
-              </button>
+
+              <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={handleWebAuthnUnlock}
+                  style={{ flex: 1, background: '#10b981', color: '#fff', border: 0, padding: '10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <Key size={14} />
+                  <span>Authenticate FIDO2 Hardware</span>
+                </button>
+
+                {badgeSimulationEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => handleBadgeUnlock('BDG-NWK-0092')}
+                    style={{ flex: 1, background: '#f59e0b', color: '#000', border: 0, padding: '10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  >
+                    <Key size={14} />
+                    <span>Dev Badge Tap (Mayor)</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Password / PIN Reauthentication Form */}

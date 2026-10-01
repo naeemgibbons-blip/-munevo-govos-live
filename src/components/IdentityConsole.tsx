@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserRole, USER_ROLES } from '../mockData';
+import { verifyBadgeUnlock, isWebNFCSupported, startWebNFCScan } from '../services/badgeAuthService';
+import { WebAuthnProvider } from '../services/credentialProviders';
+import { Fido2HardwareTestConsole } from './Fido2HardwareTestConsole';
 import { 
   ShieldCheck, 
   RefreshCw, 
@@ -32,6 +35,9 @@ interface BadgeRecord {
   uid: string;
   status: 'Active' | 'Revoked';
   lastTap: string;
+  cardType?: string;
+  pinRequired?: boolean;
+  certSerial?: string;
 }
 
 export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
@@ -42,24 +48,81 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
   handleOpenChart,
   addNotification
 }) => {
-  // SSO Active provider config state
-  const [activeSSO, setActiveSSO] = useState<'Clerk' | 'EntraID' | 'Okta' | 'Google'>('Clerk');
-  const [mfaEnabled, setMfaEnabled] = useState(true);
-
-  // Passkeys list
-  const [passkeys, setPasskeys] = useState([
-    { name: 'YubiKey 5C NFC (Primary)', added: '2026-01-15' },
-    { name: 'Windows Hello Biometrics', added: '2026-03-22' }
+  // Identity Tab & Registered FIDO2 Keys state
+  const [activeTab, setActiveTab] = useState<'overview' | 'hardware-test'>('overview');
+  const [fido2Keys, setFido2Keys] = useState<any[]>([
+    {
+      id: 'key_01',
+      credentialId: 'FIDO2-YUBIKEY-01-NWK',
+      name: 'YubiKey 5C NFC (Primary Administrator)',
+      userEmail: 'mayor@munevo.gov',
+      employeeName: 'Mayor Naeem Gibbons',
+      createdAt: '2026-01-15',
+      lastUsedAt: '2 mins ago',
+      status: 'ACTIVE'
+    },
+    {
+      id: 'key_02',
+      credentialId: 'FIDO2-WINHELLO-02-NWK',
+      name: 'Windows Hello Biometrics (Workstation 4)',
+      userEmail: 'inspector@munevo.gov',
+      employeeName: 'Elena Rostova',
+      createdAt: '2026-03-22',
+      lastUsedAt: '18 mins ago',
+      status: 'ACTIVE'
+    }
   ]);
-  const [isRegisteringKey, setIsRegisteringKey] = useState(false);
+  const webauthnProvider = new WebAuthnProvider();
 
-  // Badges list state
-  const [badges, setBadges] = useState<BadgeRecord[]>([
-    { id: '1', name: 'Mayor Gibbons', department: 'Executive Admin', uid: 'RFID-9832-NWK', status: 'Active', lastTap: '10 mins ago' },
-    { id: '2', name: 'Elena Rostova', department: 'Zoning Board', uid: 'RFID-0812-NWK', status: 'Active', lastTap: '2 hours ago' },
-    { id: '3', name: 'Marcus Miller', department: 'Inspections Div', uid: 'RFID-1102-NWK', status: 'Active', lastTap: 'Just now' },
-    { id: '4', name: 'DCF Developers Partner', department: 'External Builder', uid: 'RFID-4412-NWK', status: 'Active', lastTap: '1 day ago' }
-  ]);
+  useEffect(() => {
+    webauthnProvider.fetchCredentials().then(keys => {
+      if (keys && keys.length > 0) setFido2Keys(keys);
+    });
+  }, []);
+
+  const handleRegisterSecurityKey = async () => {
+    setIsRegisteringKey(true);
+    addNotification('Promoted: Touch your physical YubiKey or security key when browser prompt appears...');
+    const result = await webauthnProvider.registerCredential(
+      'YubiKey 5 Series (Hardware Security Key)',
+      currentRole.name === 'Mayor / City Manager' ? 'mayor@munevo.gov' : 'inspector@munevo.gov',
+      currentRole.name === 'Mayor / City Manager' ? 'Mayor Naeem Gibbons' : 'Elena Rostova'
+    );
+    setIsRegisteringKey(false);
+
+    if (result.success) {
+      addNotification(`FIDO2 Key Registered Successfully! Credential ID: ${result.credential?.credentialId}`);
+      const updated = await webauthnProvider.fetchCredentials();
+      setFido2Keys(updated);
+    } else {
+      addNotification(`Registration Notice: ${result.error}`);
+    }
+  };
+
+  const handleRevokeSecurityKey = async (id: string) => {
+    const ok = await webauthnProvider.revokeCredential(id);
+    if (ok) {
+      addNotification(`FIDO2 Security Key (${id}) has been REVOKED.`);
+      const updated = await webauthnProvider.fetchCredentials();
+      setFido2Keys(updated);
+    }
+  };
+
+  const toggleNfcListener = async () => {
+    if (!isNfcActive) {
+      setIsNfcActive(true);
+      addNotification('WebNFC Hardware Reader activated. Tap card on NFC contact area.');
+      await startWebNFCScan((serial) => {
+        addNotification(`Physical NFC Hardware Tap Detected! Badge serial: ${serial}`);
+        handleBadgeTap('mayor');
+      }, (err) => {
+        addNotification(`NFC Reader Status: ${err.message || 'Simulated Reader Active'}`);
+      });
+    } else {
+      setIsNfcActive(false);
+      addNotification('WebNFC Reader Listener deactivated.');
+    }
+  };
 
   // Security Audit trails
   const [auditLogs, setAuditLogs] = useState([
@@ -171,34 +234,62 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '20px', flex: 1, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflow: 'hidden' }}>
       
-      {/* Left Column: Badge login tapper & configuration */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
-        
-        {/* RFID/NFC Badge Tapper Simulator */}
-        <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-color)' }}>
+      {/* Sub-navigation bar */}
+      <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`btn-action ${activeTab === 'overview' ? 'active' : ''}`}
+          style={{ padding: '8px 16px', fontSize: '0.78rem', fontWeight: 700, background: activeTab === 'overview' ? 'rgba(59, 130, 246, 0.15)' : 'none', border: activeTab === 'overview' ? '1px solid #3b82f6' : '1px solid transparent', color: activeTab === 'overview' ? '#3b82f6' : 'var(--text-secondary)' }}
+        >
+          Overview & Security Credentials Roster
+        </button>
+        <button
+          onClick={() => setActiveTab('hardware-test')}
+          className={`btn-action ${activeTab === 'hardware-test' ? 'active' : ''}`}
+          style={{ padding: '8px 16px', fontSize: '0.78rem', fontWeight: 700, background: activeTab === 'hardware-test' ? 'rgba(16, 185, 129, 0.15)' : 'none', border: activeTab === 'hardware-test' ? '1px solid #10b981' : '1px solid transparent', color: activeTab === 'hardware-test' ? '#10b981' : 'var(--text-secondary)' }}
+        >
+          ⚡ FIDO2 Hardware Test Mode Diagnostic
+        </button>
+      </div>
+
+      {activeTab === 'hardware-test' ? (
+        <Fido2HardwareTestConsole addNotification={addNotification} />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '20px', flex: 1, overflow: 'hidden' }}>
+      
+          {/* Left Column: Badge login tapper & configuration */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
+            
+            {/* RFID/NFC Badge Tapper Simulator */}
+            <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-color)' }}>
           <div className="card-header" style={{ marginBottom: '8px' }}>
             <div className="card-title">
               <Cpu className="brand-gradient-text" size={16} />
               <span>HID Global Workstation Badge Reader Simulator</span>
             </div>
-            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Munevo ID Physical Tap</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className={`badge-status ${isNfcActive ? 'badge-success' : 'badge-primary'}`} style={{ fontSize: '0.62rem' }}>
+                {isNfcActive ? 'WebNFC Reader Active' : 'NFC Ready'}
+              </span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Munevo ID Physical Tap</span>
+            </div>
           </div>
 
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4, marginBottom: '14px' }}>
-            Simulate tapping an employee RFID/NFC badge on this terminal. Munevo will instantly authenticate the user, map their department permissions, and restore their Epic Hyperspace-style active workspace tab configurations.
+            Simulate tapping an employee PIV / NFC smart card badge on this terminal. Munevo will instantly authenticate the credential, enforce 4-digit PIN for high-security roles, map department permissions, and restore active workspace configurations.
           </p>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
             <button 
               className="btn-action" 
               onClick={() => handleBadgeTap('mayor')}
               style={{ flex: 1, flexDirection: 'column', padding: '12px', fontSize: '0.75rem' }}
             >
               <UserCheck size={16} style={{ color: 'var(--accent-color)', marginBottom: '4px' }} />
-              <strong>Tap Mayor\'s Badge</strong>
-              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Exec Admin (NWK-9832)</span>
+              <strong>Tap Mayor's PIV Badge</strong>
+              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>BDG-NWK-0092 (PIN Req)</span>
             </button>
 
             <button 
@@ -208,7 +299,7 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
             >
               <UserCheck size={16} style={{ color: 'var(--primary-color)', marginBottom: '4px' }} />
               <strong>Tap Inspector\'s Badge</strong>
-              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Building Insp (NWK-1102)</span>
+              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>BDG-NWK-0412 (Tap Only)</span>
             </button>
 
             <button 
@@ -217,8 +308,20 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
               style={{ flex: 1, flexDirection: 'column', padding: '12px', fontSize: '0.75rem' }}
             >
               <UserCheck size={16} style={{ color: 'var(--text-muted)', marginBottom: '4px' }} />
-              <strong>Tap Resident\'s Portal</strong>
+              <strong>Tap Citizen Portal</strong>
               <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Citizen Access</span>
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.72rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>
+              Hardware USB / WebNFC Reader: <strong style={{ color: nfcSupported ? 'var(--success-text)' : 'var(--accent-color)' }}>{nfcSupported ? 'Supported (NDEF)' : 'Simulated (OmniKey 5022)'}</strong>
+            </span>
+            <button 
+              onClick={toggleNfcListener}
+              style={{ background: isNfcActive ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', border: `1px solid ${isNfcActive ? '#ef4444' : '#10b981'}`, color: isNfcActive ? '#ef4444' : '#10b981', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.7rem' }}
+            >
+              {isNfcActive ? 'Stop NFC Listener' : 'Start NFC Listener'}
             </button>
           </div>
         </div>
@@ -306,7 +409,9 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
                 <tr>
                   <th>Employee / Holder</th>
                   <th>Department</th>
-                  <th>RFID Card UID</th>
+                  <th>Badge UID</th>
+                  <th>Card Type / Cert</th>
+                  <th>PIN Req</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
@@ -316,7 +421,15 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
                   <tr key={b.id}>
                     <td style={{ fontWeight: 600 }}>{b.name}</td>
                     <td>{b.department}</td>
-                    <td style={{ fontFamily: 'monospace' }}>{b.uid}</td>
+                    <td style={{ fontFamily: 'monospace', color: '#3b82f6' }}>{b.uid}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.65rem' }}>
+                      {b.cardType || 'PIV-CAC'} ({b.certSerial || '0x9A88F102'})
+                    </td>
+                    <td>
+                      <span className={`badge-status ${b.pinRequired ? 'badge-warn' : 'badge-primary'}`} style={{ fontSize: '0.6rem' }}>
+                        {b.pinRequired ? 'PIN Required' : 'Tap Only'}
+                      </span>
+                    </td>
                     <td>
                       <span className={`badge-status ${b.status === 'Active' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.65rem' }}>
                         {b.status}
@@ -424,6 +537,8 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
         </div>
 
       </div>
+      </div>
+      )}
 
       {/* CSS Animations */}
       <style>{`

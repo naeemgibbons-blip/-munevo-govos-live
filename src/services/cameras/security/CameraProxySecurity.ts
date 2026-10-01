@@ -1,4 +1,4 @@
-import { ALLOWED_CAMERA_DOMAINS, isAllowedCameraUrl } from './CameraUrlAllowlist.js';
+import { ALLOWED_CAMERA_DOMAINS, isAllowedCameraUrl } from './CameraUrlAllowlist.ts';
 
 export interface SecurityCheckResult {
   allowed: boolean;

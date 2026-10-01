@@ -1,10 +1,10 @@
-import { CameraConnectorRegistry } from './CameraConnectorRegistry.js';
-import { NYCDOTConnector } from '../connectors/nycdot/NYCDOTConnector.js';
-import { NJ511Connector } from '../connectors/nj511/NJ511Connector.js';
-import { NJTAConnector } from '../connectors/njta/NJTAConnector.js';
-import { ExternalViewConnector } from '../connectors/external/ExternalViewConnector.js';
-import { validateNormalizedCamera } from './CameraValidation.js';
-import type { NormalizedCamera, ConnectorHealth } from './CameraTypes.js';
+import { CameraConnectorRegistry } from './CameraConnectorRegistry.ts';
+import { NYCDOTConnector } from '../connectors/nycdot/NYCDOTConnector.ts';
+import { NJ511Connector } from '../connectors/nj511/NJ511Connector.ts';
+import { NJTAConnector } from '../connectors/njta/NJTAConnector.ts';
+import { ExternalViewConnector } from '../connectors/external/ExternalViewConnector.ts';
+import { validateNormalizedCamera } from './CameraValidation.ts';
+import type { NormalizedCamera, ConnectorHealth } from './CameraTypes.ts';
 
 export interface SyncStatistics {
   totalImported: number;
@@ -54,7 +54,7 @@ export class CameraSyncService {
         const validCameras = rawCameras.filter(cam => {
           const isValid = validateNormalizedCamera(cam);
           if (!isValid) {
-            console.warn(`[CameraSyncService] Camera record invalid from ${connector.id}:`, cam.id);
+            console.warn(`[CameraSyncService] Camera record invalid from ${connector.id}:`, (cam as any).id);
           }
           return isValid;
         });
