@@ -6,7 +6,7 @@
   "scripts": {
     "start": "ts-node server.ts",
     "dev": "concurrently \"ts-node server.ts\" \"vite\"",
-    "build": "prisma generate && tsc -b && vite build",
+    "build": "prisma generate && tsc -b && npx esbuild server.ts --bundle --platform=node --target=node18 --outfile=server.js --external:@prisma/client --external:express --external:cors --external:@supabase/supabase-js && vite build",
     "postinstall": "prisma generate",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -31,6 +31,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "concurrently": "^8.2.2",
+    "esbuild": "^0.28.2",
     "oxlint": "^1.71.0",
     "prisma": "^5.18.0",
     "ts-node": "^10.9.2",
