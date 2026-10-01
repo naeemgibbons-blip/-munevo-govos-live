@@ -358,7 +358,7 @@ export const Fido2HardwareTestConsole: React.FC<Fido2HardwareTestConsoleProps> =
                     borderRadius: '8px',
                     fontSize: '0.75rem',
                     display: 'flex',
-                    justify: 'space-between',
+                    justifyContent: 'space-between',
                     alignItems: 'center'
                   }}
                 >

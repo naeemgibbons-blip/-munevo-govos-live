@@ -48,8 +48,19 @@ export const IdentityConsole: React.FC<IdentityConsoleProps> = ({
   handleOpenChart,
   addNotification
 }) => {
-  // Identity Tab & Registered FIDO2 Keys state
   const [activeTab, setActiveTab] = useState<'overview' | 'hardware-test'>('overview');
+  const [isRegisteringKey, setIsRegisteringKey] = useState<boolean>(false);
+  const [isNfcActive, setIsNfcActive] = useState<boolean>(false);
+  const [nfcSupported, setNfcSupported] = useState<boolean>(isWebNFCSupported());
+  const [activeSSO, setActiveSSO] = useState<'ENTRA_ID' | 'OKTA' | 'PING' | 'OFF' | 'Clerk' | 'EntraID' | 'Okta' | 'Google'>('EntraID');
+  const [mfaEnabled, setMfaEnabled] = useState<boolean>(true);
+  const [passkeys, setPasskeys] = useState<any[]>([
+    { name: 'YubiKey 5 NFC (Primary Administrator)', added: '2 months ago' }
+  ]);
+  const [badges, setBadges] = useState<BadgeRecord[]>([
+    { id: '1', name: 'Mayor Naeem Gibbons', department: 'Executive', uid: 'BDG-NWK-0092', status: 'Active', lastTap: '2 mins ago', cardType: 'PIV-CAC', pinRequired: true, certSerial: '0x9A88F102' },
+    { id: '2', name: 'Elena Rostova', department: 'Inspections Desk', uid: 'BDG-NWK-0104', status: 'Active', lastTap: '18 mins ago', cardType: 'PIV-CAC', pinRequired: false, certSerial: '0x8B77E304' }
+  ]);
   const [fido2Keys, setFido2Keys] = useState<any[]>([
     {
       id: 'key_01',
