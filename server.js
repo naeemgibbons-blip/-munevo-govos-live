@@ -1,43 +1,10 @@
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
 // server.ts
-var server_exports = {};
-__export(server_exports, {
-  default: () => server_default
-});
-module.exports = __toCommonJS(server_exports);
-var import_express = __toESM(require("express"), 1);
-var import_cors = __toESM(require("cors"), 1);
-var import_client = require("@prisma/client");
-var import_supabase_js = require("@supabase/supabase-js");
-var import_fs = __toESM(require("fs"), 1);
-var import_path = __toESM(require("path"), 1);
+import express from "express";
+import cors from "cors";
+import { PrismaClient } from "@prisma/client";
+import { createClient } from "@supabase/supabase-js";
+import fs from "fs";
+import path from "path";
 
 // src/services/cameras/core/CameraConnectorRegistry.ts
 var CameraConnectorRegistry = class _CameraConnectorRegistry {
@@ -1284,9 +1251,9 @@ var BusinessOptInLifecycleService = class _BusinessOptInLifecycleService {
 // server.ts
 function loadEnvFile(filePath) {
   try {
-    const fullPath = import_path.default.resolve(filePath);
-    if (import_fs.default.existsSync(fullPath)) {
-      const content = import_fs.default.readFileSync(fullPath, "utf8");
+    const fullPath = path.resolve(filePath);
+    if (fs.existsSync(fullPath)) {
+      const content = fs.readFileSync(fullPath, "utf8");
       content.split("\n").forEach((line) => {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) return;
@@ -1314,14 +1281,14 @@ var CORRECT_DATABASE_URL = "postgresql://postgres.ihwtaxltvsgfvgcgcpdw:DYKYJHc1A
 var CORRECT_DIRECT_URL = "postgresql://postgres.ihwtaxltvsgfvgcgcpdw:DYKYJHc1Apc1aGmn@aws-1-us-west-2.pooler.supabase.com:5432/postgres";
 process.env.DATABASE_URL = CORRECT_DATABASE_URL;
 process.env.DIRECT_URL = CORRECT_DIRECT_URL;
-var prisma = new import_client.PrismaClient({
+var prisma = new PrismaClient({
   datasources: {
     db: {
       url: CORRECT_DATABASE_URL
     }
   }
 });
-var app = (0, import_express.default)();
+var app = express();
 var PORT = 3001;
 var dbUser = "undefined";
 if (process.env.DATABASE_URL) {
@@ -1343,8 +1310,8 @@ console.log("[Startup] Backend environment diagnostics:", {
   VITE_SUPABASE_ANON_KEY_exists: !!process.env.VITE_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY_exists: !!process.env.SUPABASE_SERVICE_ROLE_KEY
 });
-app.use((0, import_cors.default)());
-app.use(import_express.default.json());
+app.use(cors());
+app.use(express.json());
 app.use((req, res, next) => {
   console.log(`[API Call] ${req.method} ${req.path}`);
   next();
@@ -1450,7 +1417,7 @@ app.get("/api/tracker", async (req, res) => {
 });
 app.post("/api/tracker", async (req, res) => {
   try {
-    const { module: module2, title, status, priority, assignedTo, slaDays, address } = req.body;
+    const { module, title, status, priority, assignedTo, slaDays, address } = req.body;
     let orgId = req.headers["x-organization-id"] || req.query.orgId;
     const userId = req.headers["x-user-id"];
     const userEmail = req.headers["x-user-email"];
@@ -1477,7 +1444,7 @@ app.post("/api/tracker", async (req, res) => {
     const newItem = await prisma.trackerItem.create({
       data: {
         organizationId: orgId,
-        module: module2 || "311",
+        module: module || "311",
         title,
         status: status || "Open",
         priority: priority || "Medium",
@@ -2150,7 +2117,7 @@ app.post("/api/auth/bootstrap", async (req, res) => {
     const supabaseServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
     if (supabaseServiceRoleKey) {
       try {
-        const adminClient = (0, import_supabase_js.createClient)(resolvedUrl, supabaseServiceRoleKey, {
+        const adminClient = createClient(resolvedUrl, supabaseServiceRoleKey, {
           auth: {
             autoRefreshToken: false,
             persistSession: false
@@ -4212,3 +4179,6 @@ if (!process.env.VERCEL) {
   });
 }
 var server_default = app;
+export {
+  server_default as default
+};
