@@ -2997,7 +2997,7 @@ app.get('/api/cameras/:id', async (req, res) => {
   try {
     const syncService = CameraSyncService.getInstance();
     const cameras = await syncService.getActiveCameras();
-    const found = cameras.find(c => c.id === id || c.sourceCameraId === id);
+    const found = cameras.find((c: any) => c.id === id || c.sourceCameraId === id);
     if (!found) {
       return res.status(404).json({ error: 'Camera not found' });
     }
@@ -3013,7 +3013,7 @@ app.get('/api/cameras/:id/media', async (req, res) => {
   try {
     const syncService = CameraSyncService.getInstance();
     const cameras = await syncService.getActiveCameras();
-    const camera = cameras.find(c => c.id === id || c.sourceCameraId === id);
+    const camera = cameras.find((c: any) => c.id === id || c.sourceCameraId === id);
 
     if (!camera) {
       return res.status(404).json({ error: 'Camera record not found' });
@@ -3078,7 +3078,7 @@ app.post('/api/cameras/:id/observations', async (req, res) => {
   try {
     const syncService = CameraSyncService.getInstance();
     const cameras = await syncService.getActiveCameras();
-    const camera = cameras.find(c => c.id === id || c.sourceCameraId === id);
+    const camera = cameras.find((c: any) => c.id === id || c.sourceCameraId === id);
 
     const routing = camera 
       ? RiskRoutingService.evaluateRouting(category || 'General Incident', camera)
